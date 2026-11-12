@@ -1,0 +1,6 @@
+{
+  "name": "EduERP v2.0",
+  "description": "Smart Educational ERP System - Phase 1 Auth & Design System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

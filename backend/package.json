@@ -1,0 +1,24 @@
+{
+  "name": "eduerp-backend",
+  "version": "1.0.0",
+  "description": "EduERP RESTful API Backend Service",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js",
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.8",
+    "@types/node": "^20.17.19",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "~5.9.2"
+  }
+}

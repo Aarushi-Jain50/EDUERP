@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eduerp_postgres
+    environment:
+      POSTGRES_DB: eduerp
+      POSTGRES_USER: eduerp_user
+      POSTGRES_PASSWORD: eduerp_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../databases/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../databases/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
+    container_name: eduerp_backend
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://eduerp_user:eduerp_secure_password@postgres:5432/eduerp
+      JWT_SECRET: super_secret_eduerp_jwt_key
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.frontend
+    container_name: eduerp_frontend
+    environment:
+      PORT: 3000
+      BACKEND_API_URL: http://backend:4000/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,78 @@
+/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-midnight: #1A1745;
+  --color-indigo-deep: #0F0D2E;
+  --color-violet-primary: #6D42E8;
+  --color-aurora: #D946EF;
+  --color-erp-bg: #F5F6FF;
+  --color-erp-card: #FFFFFF;
+  --color-erp-text: #172554;
+  --color-erp-muted: #64748B;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-erp-bg);
+  color: var(--color-erp-text);
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom glassmorphism and aurora glow utilities */
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(109, 66, 232, 0.15);
+}
+
+.glass-dark {
+  background: rgba(26, 23, 69, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(217, 70, 239, 0.2);
+}
+
+.aurora-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(217, 70, 239, 0.18) 0%, rgba(109, 66, 232, 0.08) 50%, transparent 80%);
+}
+
+.gradient-brand {
+  background: linear-gradient(135deg, #1A1745 0%, #0F0D2E 50%, #6D42E8 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, #6D42E8 0%, #D946EF 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #6D42E8 0%, #D946EF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom slim modern scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(109, 66, 232, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(109, 66, 232, 0.4);
+}
+
+aside nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+aside nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+

@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check user role
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    // Super Admin has full access to everything
+    match /{document=**} {
+      allow read, write: if hasRole('Super Admin');
+    }
+
+    // Academic & People read access for authenticated users
+    match /academic_years/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('Admin') || hasRole('Super Admin');
+    }
+
+    match /departments/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('Admin') || hasRole('Super Admin');
+    }
+
+    match /students/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('Admin') || hasRole('Super Admin');
+    }
+
+    match /user_accounts/{id} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('Super Admin');
+    }
+  }
+}

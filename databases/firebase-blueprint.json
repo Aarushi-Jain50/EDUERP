@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "academic_years": {
+      "title": "Academic Years",
+      "description": "Collection of academic year sessions",
+      "type": "object",
+      "properties": {
+        "year": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "departments": {
+      "title": "Departments",
+      "description": "University academic departments",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "hodName": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "students": {
+      "title": "Students",
+      "description": "Enrolled student records",
+      "type": "object",
+      "properties": {
+        "enrollmentNo": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "courseName": { "type": "string" },
+        "semester": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "user_accounts": {
+      "title": "User Accounts",
+      "description": "System access and login accounts",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    }
+  }
+}
