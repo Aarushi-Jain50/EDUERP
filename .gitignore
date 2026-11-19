@@ -4,6 +4,11 @@
 .env*
 !.env.example
 
+# Runtime auth database & local secrets
+/databases/*.sqlite*
+/databases/.jwt-secret
+/databases/*.log
+
 # Compiled output
 /dist
 /tmp

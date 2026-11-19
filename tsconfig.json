@@ -12,6 +12,10 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "outDir": "./out-tsc/app",
     "types": [
       "node"

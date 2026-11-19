@@ -149,7 +149,6 @@ export class FacultyReportsPage {
     const faculty = this.facultyService.facultyList();
     const slots = this.timetableService.slots();
     const assignments = this.assignmentsService.assignments();
-    const subjects = this.academicService.subjects();
 
     return faculty.map(f => {
       const facultySlots = slots.filter(s => s.facultyId === f.id);

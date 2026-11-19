@@ -1,3 +1,10 @@
+export enum RbacRole {
+  ADMIN = 'ADMIN',
+  FACULTY = 'FACULTY',
+  STUDENT = 'STUDENT',
+  PARENT = 'PARENT'
+}
+
 export type ProfileType = 'Student' | 'Faculty' | 'Parent' | 'Staff';
 export type UserStatus = 'Active' | 'Inactive';
 

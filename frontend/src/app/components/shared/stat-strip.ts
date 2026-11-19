@@ -13,22 +13,28 @@ export interface StatItem {
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-stat-strip',
   imports: [],
+  host: {
+    class: 'block'
+  },
   template: `
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-      @for (item of items().slice(0, 3); track item.label) {
-        <div class="bg-white rounded-xl border border-[#E2E8F0] p-4 h-[92px] shadow-xs flex items-center justify-between gap-3">
-          <div class="space-y-0.5 min-w-0 flex-1">
-            <span class="text-xs font-medium text-[#64748B] block truncate leading-tight">{{ item.label }}</span>
-            <div class="text-[22px] font-semibold text-slate-900 tracking-tight leading-snug">{{ item.value }}</div>
+    <div class="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-5">
+      @for (item of items().slice(0, 3); track item.label; let last = $last; let count = $count) {
+        <div
+          class="bg-white rounded-xl border border-slate-200/90 hover:border-slate-300/90 px-4 py-3.5 sm:px-5 sm:py-4 min-h-[84px] sm:min-h-[96px] shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors flex items-center justify-between gap-3 sm:gap-4"
+          [class]="last && count === 3 ? 'min-[380px]:col-span-2 md:col-span-1' : ''"
+        >
+          <div class="space-y-1 min-w-0 flex-1">
+            <span class="text-xs font-medium text-slate-500 block truncate leading-tight">{{ item.label }}</span>
+            <div class="font-display text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug tabular-nums">{{ item.value }}</div>
             @if (item.subtext) {
-              <p class="text-xs text-[#64748B] font-medium truncate leading-none">{{ item.subtext }}</p>
+              <p class="text-[11px] text-slate-500 font-medium truncate leading-tight">{{ item.subtext }}</p>
             }
           </div>
           <div
-            class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border"
-            [class]="item.iconBgClass || 'bg-purple-50 border-purple-100 text-[#6D42E8]'"
+            class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-200/80 bg-slate-50 text-indigo-600"
+            [class]="item.iconBgClass || 'bg-slate-50 border-slate-200/80 text-indigo-600'"
           >
-            <span class="material-icons text-lg" [class]="item.iconColorClass || 'text-[#6D42E8]'">{{ item.icon }}</span>
+            <span class="material-icons text-base sm:text-lg" [class]="item.iconColorClass || 'text-indigo-600'">{{ item.icon }}</span>
           </div>
         </div>
       }

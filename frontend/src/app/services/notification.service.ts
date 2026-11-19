@@ -13,6 +13,9 @@ export interface Notification {
   isRead: boolean;
   link?: string; // Route to navigate to
   icon?: string;
+  targetRole?: 'student' | 'faculty' | 'admin';
+  targetStudentId?: string;
+  targetFacultyId?: string;
 }
 
 @Injectable({ providedIn: 'root' })

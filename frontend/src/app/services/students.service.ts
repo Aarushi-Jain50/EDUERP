@@ -426,6 +426,27 @@ export class StudentsService {
       admissionDate: '2025-07-24',
       status: 'Active',
       guardian: { name: 'Prabhakar Reddy', relation: 'Father', phone: '9848000000' }
+    },
+    {
+      id: 'stu-21',
+      enrollmentNo: 'BCA-2025-032',
+      name: 'Aanya Verma',
+      initials: 'AV',
+      gender: 'Female',
+      dob: '2005-03-10',
+      email: 'aanya.verma@eduerp.edu',
+      phone: '9811223355',
+      address: 'Flat 402, Green Park Apartments, New Delhi',
+      courseId: 'course-bca',
+      course: 'Bachelor of Computer Applications',
+      departmentId: 'dept-mca',
+      department: 'Computer Applications',
+      semester: 'Semester 2',
+      sectionId: 'sec-3',
+      section: 'Section A',
+      admissionDate: '2025-07-21',
+      status: 'Active',
+      guardian: { name: 'Sanjay Verma', relation: 'Father', phone: '9811223344' }
     }
   ]);
 

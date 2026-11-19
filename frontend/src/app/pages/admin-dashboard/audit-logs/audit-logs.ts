@@ -116,7 +116,7 @@ import { AuditService, AuditEntry } from '../../../services/audit.service';
       <!-- Detail Drawer -->
       @if (selectedLog()) {
         <div class="fixed inset-0 z-50 flex justify-end">
-          <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" (click)="selectedLog.set(null)"></div>
+          <button type="button" aria-label="Close details" (click)="selectedLog.set(null)" (keydown.enter)="selectedLog.set(null)" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm w-full h-full border-0 cursor-default"></button>
           <div class="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-slide-in-right">
             <div class="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 class="text-lg font-extrabold text-[#172554] tracking-tight">Log Details</h2>

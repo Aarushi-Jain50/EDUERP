@@ -1,0 +1,316 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isOwner(ownerUid) {
+      return isVerifiedUser() && request.auth.uid == ownerUid;
+    }
+
+    function isValidId(id) {
+      return id is string &&
+        id.size() > 0 &&
+        id.size() <= 128 &&
+        id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'enrollmentNo', 'name', 'email', 'ownerUid']) &&
+        data.keys().hasOnly([
+          'id', 'enrollmentNo', 'name', 'email', 'phone', 'address',
+          'course', 'department', 'semester', 'section', 'status', 'ownerUid', 'createdAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.enrollmentNo is string && data.enrollmentNo.size() > 0 && data.enrollmentNo.size() <= 64 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 120 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll(['id', 'title', 'subjectCode', 'studentId', 'ownerUid']) &&
+        data.keys().hasOnly([
+          'id', 'title', 'subjectCode', 'dueDate', 'status',
+          'submittedAt', 'grade', 'feedback', 'studentId', 'ownerUid'
+        ]) &&
+        isValidId(data.id) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.subjectCode is string && data.subjectCode.size() > 0 && data.subjectCode.size() <= 30 &&
+        isValidId(data.studentId) &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidAssignmentSubmission(data) {
+      return data.keys().hasAll([
+          'id', 'assignmentId', 'studentId', 'status', 'answerText',
+          'questionAnswersCount', 'attachmentsCount', 'version',
+          'submittedAt', 'updatedAt', 'ownerUid'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'assignmentId', 'studentId', 'status', 'answerText',
+          'questionAnswersCount', 'questionAnswers', 'attachmentsCount',
+          'version', 'submittedAt', 'updatedAt', 'ownerUid'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.assignmentId) &&
+        isValidId(data.studentId) &&
+        data.status in ['Draft', 'Submitted', 'Late', 'Evaluated'] &&
+        data.answerText is string && data.answerText.size() <= 5000 &&
+        data.questionAnswersCount is int && data.questionAnswersCount >= 0 && data.questionAnswersCount <= 50 &&
+        (!('questionAnswers' in data) || (data.questionAnswers is map && data.questionAnswers.size() <= 50)) &&
+        data.attachmentsCount is int && data.attachmentsCount >= 0 &&
+        data.version is int && data.version >= 0 &&
+        data.submittedAt is string && data.submittedAt.size() <= 60 &&
+        data.updatedAt is string && data.updatedAt.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidFeePayment(data) {
+      return data.keys().hasAll([
+          'id', 'studentId', 'studentName', 'courseName', 'title',
+          'amount', 'dueDate', 'paymentMethod', 'status',
+          'receiptNo', 'refNo', 'ownerUid', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'studentId', 'studentName', 'courseName', 'title',
+          'amount', 'installmentId', 'dueDate', 'paymentMethod', 'status',
+          'receiptNo', 'refNo', 'ownerUid', 'createdAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.studentId) &&
+        data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 120 &&
+        data.courseName is string && data.courseName.size() > 0 && data.courseName.size() <= 100 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+        data.amount is number && data.amount > 0 &&
+        (!('installmentId' in data) || (data.installmentId is string && data.installmentId.size() <= 128)) &&
+        data.dueDate is string && data.dueDate.size() <= 50 &&
+        data.paymentMethod in ['Cash', 'UPI', 'Cheque', 'Card', 'Bank Transfer'] &&
+        data.status == 'Paid' &&
+        data.receiptNo is string && data.receiptNo.size() > 0 && data.receiptNo.size() <= 60 &&
+        data.refNo is string && data.refNo.size() > 0 && data.refNo.size() <= 80 &&
+        data.createdAt is string && data.createdAt.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidLeaveRequest(data) {
+      return data.keys().hasAll([
+          'id', 'studentId', 'enrollmentNo', 'studentName', 'leaveType',
+          'fromDate', 'toDate', 'reason', 'status', 'ownerUid', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'studentId', 'enrollmentNo', 'studentName', 'leaveType',
+          'fromDate', 'toDate', 'reason', 'status', 'sessionRef',
+          'ownerUid', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.studentId) &&
+        data.enrollmentNo is string && data.enrollmentNo.size() > 0 && data.enrollmentNo.size() <= 64 &&
+        data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 120 &&
+        data.leaveType in ['Medical', 'On-Duty (OD)', 'Academic Event', 'Personal'] &&
+        data.fromDate is string && data.fromDate.size() > 0 && data.fromDate.size() <= 50 &&
+        data.toDate is string && data.toDate.size() > 0 && data.toDate.size() <= 50 &&
+        data.reason is string && data.reason.size() > 0 && data.reason.size() <= 500 &&
+        data.status in ['Pending', 'Approved', 'Rejected', 'Withdrawn'] &&
+        (!('sessionRef' in data) || (data.sessionRef is string && data.sessionRef.size() <= 100)) &&
+        data.createdAt is string && data.createdAt.size() <= 60 &&
+        data.updatedAt is string && data.updatedAt.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidSupportTicket(data) {
+      return data.keys().hasAll([
+          'id', 'ticketNo', 'studentId', 'enrollmentNo', 'studentName',
+          'category', 'priority', 'subject', 'description',
+          'status', 'replies', 'ownerUid', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'ticketNo', 'studentId', 'enrollmentNo', 'studentName',
+          'category', 'priority', 'subject', 'description',
+          'status', 'replies', 'ownerUid', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.ticketNo is string && data.ticketNo.size() > 0 && data.ticketNo.size() <= 40 &&
+        isValidId(data.studentId) &&
+        data.enrollmentNo is string && data.enrollmentNo.size() > 0 && data.enrollmentNo.size() <= 64 &&
+        data.studentName is string && data.studentName.size() > 0 && data.studentName.size() <= 120 &&
+        data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
+        data.priority in ['Normal', 'High', 'Urgent'] &&
+        data.subject is string && data.subject.size() > 0 && data.subject.size() <= 200 &&
+        data.description is string && data.description.size() > 0 && data.description.size() <= 1000 &&
+        data.status in ['Open', 'In Progress', 'Resolved', 'Closed'] &&
+        data.replies is list && data.replies.size() <= 50 &&
+        data.createdAt is string && data.createdAt.size() <= 60 &&
+        data.updatedAt is string && data.updatedAt.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidExamAttempt(data) {
+      return data.keys().hasAll([
+          'id', 'examId', 'examTitle', 'subjectCode', 'mode',
+          'studentId', 'enrollmentNo', 'status', 'answersCount', 'answers',
+          'violationsCount', 'violationLogs', 'proctorVerified',
+          'startedAt', 'submittedAt', 'updatedAt', 'verificationHash', 'ownerUid'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'examId', 'examTitle', 'subjectCode', 'mode',
+          'studentId', 'enrollmentNo', 'status', 'answersCount', 'answers',
+          'violationsCount', 'violationLogs', 'proctorVerified',
+          'startedAt', 'submittedAt', 'updatedAt', 'autoSubmitReason', 'verificationHash', 'ownerUid'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.examId) &&
+        data.examTitle is string && data.examTitle.size() > 0 && data.examTitle.size() <= 200 &&
+        data.subjectCode is string && data.subjectCode.size() > 0 && data.subjectCode.size() <= 30 &&
+        data.mode in ['Online', 'Offline', 'Hybrid'] &&
+        isValidId(data.studentId) &&
+        data.enrollmentNo is string && data.enrollmentNo.size() > 0 && data.enrollmentNo.size() <= 64 &&
+        data.status in ['In Progress', 'Submitted'] &&
+        data.answersCount is int && data.answersCount >= 0 && data.answersCount <= 40 &&
+        data.answers is map && data.answers.size() <= 40 &&
+        data.violationsCount is int && data.violationsCount >= 0 && data.violationsCount <= 10 &&
+        data.violationLogs is list && data.violationLogs.size() <= 20 &&
+        (data.violationLogs.size() == 0 || data.violationLogs[0] is map) &&
+        data.proctorVerified is bool &&
+        data.startedAt is string && data.startedAt.size() <= 60 &&
+        data.submittedAt is string && data.submittedAt.size() <= 60 &&
+        data.updatedAt is string && data.updatedAt.size() <= 60 &&
+        (!('autoSubmitReason' in data) || (data.autoSubmitReason is string && data.autoSubmitReason.size() <= 160)) &&
+        data.verificationHash is string && data.verificationHash.size() > 0 && data.verificationHash.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /students/{studentId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(studentId) &&
+        isValidStudent(request.resource.data) &&
+        request.resource.data.id == studentId;
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidStudent(request.resource.data) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
+    match /assignments/{assignmentId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(assignmentId) &&
+        isValidAssignment(request.resource.data) &&
+        request.resource.data.id == assignmentId;
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidAssignment(request.resource.data) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
+    match /assignmentSubmissions/{submissionId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(submissionId) &&
+        isValidAssignmentSubmission(request.resource.data) &&
+        request.resource.data.id == submissionId &&
+        request.resource.data.status != 'Evaluated';
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidAssignmentSubmission(request.resource.data) &&
+        resource.data.status != 'Evaluated' &&
+        request.resource.data.status != 'Evaluated' &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.assignmentId == resource.data.assignmentId &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
+    match /feePayments/{paymentId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(paymentId) &&
+        isValidFeePayment(request.resource.data) &&
+        request.resource.data.id == paymentId;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /leaveRequests/{requestId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(requestId) &&
+        isValidLeaveRequest(request.resource.data) &&
+        request.resource.data.id == requestId &&
+        request.resource.data.status == 'Pending';
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidLeaveRequest(request.resource.data) &&
+        resource.data.status == 'Pending' &&
+        request.resource.data.status == 'Withdrawn' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
+    match /supportTickets/{ticketId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(ticketId) &&
+        isValidSupportTicket(request.resource.data) &&
+        request.resource.data.id == ticketId &&
+        request.resource.data.status == 'Open';
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidSupportTicket(request.resource.data) &&
+        resource.data.status != 'Closed' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies', 'updatedAt']) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+
+    match /examAttempts/{attemptId} {
+      allow get: if isOwner(resource.data.ownerUid);
+      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidExamAttempt(request.resource.data) &&
+        request.resource.data.id == attemptId &&
+        request.resource.data.status == 'In Progress';
+      allow update: if isOwner(resource.data.ownerUid) &&
+        isValidExamAttempt(request.resource.data) &&
+        resource.data.status == 'In Progress' &&
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answers', 'answersCount', 'updatedAt']) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['violationsCount', 'violationLogs', 'updatedAt']) ||
+          (
+            request.resource.data.status == 'Submitted' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'answers', 'answersCount', 'submittedAt', 'updatedAt', 'autoSubmitReason'])
+          )
+        ) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.examId == resource.data.examId &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.startedAt == resource.data.startedAt &&
+        request.resource.data.verificationHash == resource.data.verificationHash &&
+        request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if false;
+    }
+  }
+}

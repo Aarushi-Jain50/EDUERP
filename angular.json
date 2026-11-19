@@ -55,7 +55,13 @@
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": false,
+              "externalDependencies": [
+                "firebase-admin",
+                "pg",
+                "drizzle-orm",
+                "@google/genai"
+              ]
             }
           },
           "defaultConfiguration": "production"

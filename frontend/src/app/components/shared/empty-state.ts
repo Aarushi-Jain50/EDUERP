@@ -4,6 +4,9 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-empty-state',
   imports: [],
+  host: {
+    class: 'block'
+  },
   template: `
     <div class="py-16 px-6 text-center">
       <div class="w-12 h-12 rounded-full bg-slate-100 text-[#64748B] mx-auto flex items-center justify-center mb-3">

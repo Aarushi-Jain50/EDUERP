@@ -15,7 +15,13 @@ export function exportToExcel<T extends object>(rows: T[], filename: string): vo
 /**
  * Exports data to PDF using jsPDF + AutoTable
  */
-export function exportToPdf(title: string, columns: string[], rows: (string | number)[][], filename: string): void {
+export function exportToPdf(
+  title: string,
+  columns: string[],
+  rows: (string | number)[][],
+  filename: string,
+  metaLines: string[] = []
+): void {
   const doc = new jsPDF('l', 'mm', 'a4');
   const now = new Date().toLocaleString();
 
@@ -31,14 +37,24 @@ export function exportToPdf(title: string, columns: string[], rows: (string | nu
   doc.setFontSize(8);
   doc.text(`Generated on: ${now}`, 14, 27);
 
+  let startY = 32;
+  if (metaLines.length > 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    metaLines.forEach((line, idx) => {
+      doc.text(line, 14, 33 + idx * 5);
+    });
+    startY = 35 + metaLines.length * 5;
+  }
+
   autoTable(doc, {
-    startY: 32,
+    startY,
     head: [columns],
     body: rows,
     theme: 'striped',
     headStyles: { fillColor: [109, 66, 232], textColor: 255 }, // Indigo
     styles: { fontSize: 8, cellPadding: 2 },
-    margin: { top: 32 },
+    margin: { top: startY },
     didDrawPage: (data) => {
       // Footer
       const str = `Page ${doc.getNumberOfPages()}`;

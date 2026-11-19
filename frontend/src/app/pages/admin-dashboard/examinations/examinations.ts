@@ -8,7 +8,7 @@ import { DataTable, TableColumn } from '../../../components/shared/data-table';
 import { FormDrawer } from '../../../components/shared/form-drawer';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
 import { StatusBadge } from '../../../components/shared/status-badge';
-import { ExaminationsService, Examination, ExamType } from '../../../services/examinations.service';
+import { ExaminationsService, Examination, ExamMode, ExamType } from '../../../services/examinations.service';
 import { AcademicService } from '../../../services/academic.service';
 
 @Component({
@@ -64,7 +64,7 @@ import { AcademicService } from '../../../services/academic.service';
             <input id="ex-title" formControlName="title" [readonly]="isViewOnly()" placeholder="e.g. End-Term Theory Exam" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8] disabled:bg-slate-50" />
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-3 gap-4">
             <div class="space-y-1.5">
               <label for="ex-type" class="text-xs font-semibold text-slate-800">Exam Type <span class="text-red-500">*</span></label>
               <select id="ex-type" formControlName="type" [attr.disabled]="isViewOnly() ? true : null" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]">
@@ -72,6 +72,14 @@ import { AcademicService } from '../../../services/academic.service';
                 <option value="Mid-Term">Mid-Term</option>
                 <option value="End-Term">End-Term</option>
                 <option value="Practical">Practical</option>
+              </select>
+            </div>
+            <div class="space-y-1.5">
+              <label for="ex-mode" class="text-xs font-semibold text-slate-800">Delivery Mode <span class="text-red-500">*</span></label>
+              <select id="ex-mode" formControlName="mode" [attr.disabled]="isViewOnly() ? true : null" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]">
+                <option value="Online">Online (Proctored)</option>
+                <option value="Offline">Offline (Hall)</option>
+                <option value="Hybrid">Hybrid</option>
               </select>
             </div>
             <div class="space-y-1.5">
@@ -84,6 +92,22 @@ import { AcademicService } from '../../../services/academic.service';
               </select>
             </div>
           </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label for="ex-venue" class="text-xs font-semibold text-slate-800">Hall / Platform Venue</label>
+              <input id="ex-venue" formControlName="venue" [readonly]="isViewOnly()" placeholder="e.g. Block C Hall 204 or Protected Online Browser" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]" />
+            </div>
+            <div class="space-y-1.5">
+              <label for="ex-seat" class="text-xs font-semibold text-slate-800">Default Seat / Block</label>
+              <input id="ex-seat" formControlName="seatNo" [readonly]="isViewOnly()" placeholder="e.g. C-204-21 (Offline/Hybrid)" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]" />
+            </div>
+          </div>
+
+          <label for="ex-proctored" class="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer">
+            <input id="ex-proctored" type="checkbox" formControlName="proctored" [attr.disabled]="isViewOnly() ? true : null" class="w-4 h-4 rounded accent-[#6D42E8]" />
+            <span>Enable strict browser proctoring &amp; tab-switch protection</span>
+          </label>
 
           <div class="space-y-1.5">
             <label for="ex-course" class="text-xs font-semibold text-slate-800">Course / Program <span class="text-red-500">*</span></label>
@@ -105,14 +129,18 @@ import { AcademicService } from '../../../services/academic.service';
             </select>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-3 gap-4">
             <div class="space-y-1.5">
-              <label for="ex-date" class="text-xs font-semibold text-slate-800">Date <span class="text-red-500">*</span></label>
+              <label for="ex-date" class="text-xs font-semibold text-slate-800">Exam Date <span class="text-red-500">*</span></label>
               <input id="ex-date" formControlName="date" [readonly]="isViewOnly()" type="date" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]" />
             </div>
             <div class="space-y-1.5">
               <label for="ex-time" class="text-xs font-semibold text-slate-800">Start Time <span class="text-red-500">*</span></label>
               <input id="ex-time" formControlName="time" [readonly]="isViewOnly()" type="time" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]" />
+            </div>
+            <div class="space-y-1.5">
+              <label for="ex-result-date" class="text-xs font-semibold text-slate-800">Result Date</label>
+              <input id="ex-result-date" formControlName="resultAnnouncementDate" [readonly]="isViewOnly()" type="date" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]" />
             </div>
           </div>
 
@@ -163,11 +191,16 @@ export class ExaminationsPage {
   protected readonly form = new FormGroup({
     title: new FormControl('', Validators.required),
     type: new FormControl<ExamType>('Internal', Validators.required),
+    mode: new FormControl<ExamMode>('Offline', Validators.required),
+    venue: new FormControl(''),
+    seatNo: new FormControl(''),
+    proctored: new FormControl(false),
     courseId: new FormControl('', Validators.required),
     semester: new FormControl('Semester 2', Validators.required),
     subjectId: new FormControl('', Validators.required),
     date: new FormControl('', Validators.required),
     time: new FormControl('', Validators.required),
+    resultAnnouncementDate: new FormControl(''),
     duration: new FormControl(180, [Validators.required, Validators.min(1)]),
     maxMarks: new FormControl(100, [Validators.required, Validators.min(1)]),
     passingMarks: new FormControl(40, [Validators.required, Validators.min(1)])
@@ -220,9 +253,9 @@ export class ExaminationsPage {
   protected readonly columns: TableColumn[] = [
     { key: 'title', header: 'Examination', isBold: true },
     { key: 'subjectName', header: 'Subject' },
-    { key: 'courseName', header: 'Course' },
-    { key: 'date', header: 'Date' },
-    { key: 'time', header: 'Time' },
+    { key: 'mode', header: 'Mode', isBadge: true },
+    { key: 'date', header: 'Exam Date' },
+    { key: 'resultAnnouncementDate', header: 'Result Date' },
     { key: 'maxMarks', header: 'Max' },
     { key: 'status', header: 'Status', isBadge: true }
   ];
@@ -233,7 +266,12 @@ export class ExaminationsPage {
     this.formError.set('');
     this.form.reset({
       type: 'Internal',
+      mode: 'Offline',
+      venue: '',
+      seatNo: '',
+      proctored: false,
       semester: 'Semester 2',
+      resultAnnouncementDate: '',
       duration: 180,
       maxMarks: 100,
       passingMarks: 40
@@ -318,12 +356,23 @@ export class ExaminationsPage {
       }
     }
 
+    if (val.resultAnnouncementDate && val.date && val.resultAnnouncementDate < val.date) {
+      this.formError.set('Result announcement date cannot be earlier than the exam date.');
+      return;
+    }
+
     const courseName = this.academicService.courses().find(c => c.id === val.courseId)?.name || '';
     const subjectName = this.academicService.subjects().find(s => s.id === val.subjectId)?.name || '';
 
+    const mode: ExamMode = val.mode || 'Offline';
     const examData: Omit<Examination, 'id'> = {
       title: val.title!,
       type: val.type!,
+      mode,
+      venue: val.venue?.trim() || (mode === 'Online' ? 'Protected Online Exam Browser' : 'Examination Hall'),
+      seatNo: val.seatNo?.trim() || undefined,
+      proctored: Boolean(val.proctored) || mode === 'Online',
+      reportingMinutesBefore: mode === 'Offline' ? 30 : mode === 'Hybrid' ? 15 : undefined,
       courseId: val.courseId!,
       courseName,
       semester: val.semester!,
@@ -331,6 +380,8 @@ export class ExaminationsPage {
       subjectName,
       date: val.date!,
       time: val.time!,
+      resultAnnouncementDate: val.resultAnnouncementDate?.trim() || undefined,
+      resultAnnouncementTime: '17:00',
       duration: val.duration!,
       maxMarks: val.maxMarks!,
       passingMarks: val.passingMarks!

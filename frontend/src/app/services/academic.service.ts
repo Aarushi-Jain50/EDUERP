@@ -510,7 +510,12 @@ export class AcademicService {
     { id: 'sub-4', code: 'MCA-204E', name: 'Cloud Computing & DevOps', course: 'Master of Computer Applications', semester: 'Semester 2', type: 'Elective', credits: 3, status: 'Active' },
     { id: 'sub-5', code: 'BCA-101', name: 'Discrete Mathematics', course: 'Bachelor of Computer Applications', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' },
     { id: 'sub-6', code: 'BCA-102L', name: 'Java Programming Lab', course: 'Bachelor of Computer Applications', semester: 'Semester 2', type: 'Practical', credits: 2, status: 'Active' },
-    { id: 'sub-7', code: 'CSE-201', name: 'Object Oriented Design & C++', course: 'B.Tech Computer Science & Engineering', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' }
+    { id: 'sub-7', code: 'CSE-201', name: 'Object Oriented Design & C++', course: 'B.Tech Computer Science & Engineering', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' },
+    { id: 'sub-8', code: 'MCA-205', name: 'Artificial Intelligence & ML', course: 'Master of Computer Applications', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' },
+    { id: 'sub-9', code: 'MCA-206', name: 'Cyber Security & Ethics', course: 'Master of Computer Applications', semester: 'Semester 2', type: 'Theory', credits: 3, status: 'Active' },
+    { id: 'sub-10', code: 'BCA-103', name: 'Database Management Systems', course: 'Bachelor of Computer Applications', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' },
+    { id: 'sub-11', code: 'CSE-202', name: 'Operating Systems', course: 'B.Tech Computer Science & Engineering', semester: 'Semester 2', type: 'Theory', credits: 4, status: 'Active' },
+    { id: 'sub-12', code: 'CSE-203', name: 'Computer Networks', course: 'B.Tech Computer Science & Engineering', semester: 'Semester 2', type: 'Theory', credits: 3, status: 'Active' }
   ]);
 
   // ==========================================
@@ -520,7 +525,10 @@ export class AcademicService {
     { id: 'alloc-1', subject: 'Advanced Data Structures & Algorithms', faculty: 'Dr. Amit Joshi', course: 'Master of Computer Applications', semester: 'Semester 2', section: 'Section A', weeklyHours: 4 },
     { id: 'alloc-2', subject: 'Enterprise Web Application Architecture', faculty: 'Prof. Ananya Sen', course: 'Master of Computer Applications', semester: 'Semester 2', section: 'Section A', weeklyHours: 4 },
     { id: 'alloc-3', subject: 'Full Stack Development Lab', faculty: 'Dr. S. N. Roy', course: 'Master of Computer Applications', semester: 'Semester 2', section: 'Section A', weeklyHours: 3 },
-    { id: 'alloc-4', subject: 'Cloud Computing & DevOps', faculty: 'Prof. Sandeep Bansal', course: 'Master of Computer Applications', semester: 'Semester 2', section: 'Section B', weeklyHours: 3 }
+    { id: 'alloc-4', subject: 'Cloud Computing & DevOps', faculty: 'Prof. Sandeep Bansal', course: 'Master of Computer Applications', semester: 'Semester 2', section: 'Section B', weeklyHours: 3 },
+    { id: 'alloc-5', subject: 'Discrete Mathematics', faculty: 'Prof. Meena Sharma', course: 'Bachelor of Computer Applications', semester: 'Semester 2', section: 'Section A', weeklyHours: 4 },
+    { id: 'alloc-6', subject: 'Java Programming Lab', faculty: 'Prof. Ananya Sen', course: 'Bachelor of Computer Applications', semester: 'Semester 2', section: 'Section A', weeklyHours: 3 },
+    { id: 'alloc-7', subject: 'Object Oriented Design & C++', faculty: 'Dr. Rajesh Khanna', course: 'B.Tech Computer Science & Engineering', semester: 'Semester 2', section: 'Section A', weeklyHours: 4 }
   ]);
 
   // Readonly exposures

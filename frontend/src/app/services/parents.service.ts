@@ -19,8 +19,8 @@ export class ParentsService {
       email: 'sanjay.verma@gmail.com',
       occupation: 'Business / IT Consultant',
       address: 'Flat 402, Green Park Apartments, New Delhi',
-      studentIds: ['stu-1'],
-      studentNames: ['Rahul Verma'],
+      studentIds: ['stu-1', 'stu-21'],
+      studentNames: ['Rahul Verma', 'Aanya Verma'],
       status: 'Active'
     },
     {

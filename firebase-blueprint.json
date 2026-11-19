@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student Profile",
+      "description": "Student enrollment and contact profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "enrollmentNo": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 15 },
+        "address": { "type": "string", "maxLength": 500 },
+        "course": { "type": "string", "maxLength": 100 },
+        "department": { "type": "string", "maxLength": 100 },
+        "semester": { "type": "string", "maxLength": 20 },
+        "section": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "maxLength": 30 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "enrollmentNo", "name", "email", "ownerUid"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Course assignments and multi-subject worksheets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "maxLength": 200 },
+        "subjectCode": { "type": "string", "maxLength": 30 },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "maxLength": 30 },
+        "submittedAt": { "type": "string", "maxLength": 50 },
+        "grade": { "type": "string", "maxLength": 20 },
+        "feedback": { "type": "string", "maxLength": 500 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "title", "subjectCode", "studentId", "ownerUid"]
+    },
+    "AssignmentSubmission": {
+      "title": "Assignment Submission",
+      "description": "Student worksheet answers and submission metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignmentId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["Draft", "Submitted", "Late", "Evaluated"] },
+        "answerText": { "type": "string", "maxLength": 5000 },
+        "questionAnswersCount": { "type": "number", "minimum": 0, "maximum": 50 },
+        "questionAnswers": { "type": "object" },
+        "attachmentsCount": { "type": "number", "minimum": 0 },
+        "version": { "type": "number", "minimum": 0 },
+        "submittedAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": [
+        "id",
+        "assignmentId",
+        "studentId",
+        "status",
+        "answerText",
+        "questionAnswersCount",
+        "attachmentsCount",
+        "version",
+        "submittedAt",
+        "updatedAt",
+        "ownerUid"
+      ]
+    },
+    "FeePayment": {
+      "title": "Fee Payment",
+      "description": "Immutable student fee payment ledger and receipts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "courseName": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "amount": { "type": "number", "minimum": 1 },
+        "installmentId": { "type": "string", "maxLength": 128 },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "UPI", "Cheque", "Card", "Bank Transfer"] },
+        "status": { "type": "string", "enum": ["Paid"] },
+        "receiptNo": { "type": "string", "maxLength": 60 },
+        "refNo": { "type": "string", "maxLength": 80 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "studentName",
+        "courseName",
+        "title",
+        "amount",
+        "dueDate",
+        "paymentMethod",
+        "status",
+        "receiptNo",
+        "refNo",
+        "ownerUid",
+        "createdAt"
+      ]
+    },
+    "LeaveRequest": {
+      "title": "Leave Request",
+      "description": "Student leave and attendance regularization request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "enrollmentNo": { "type": "string", "maxLength": 64 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "leaveType": { "type": "string", "enum": ["Medical", "On-Duty (OD)", "Academic Event", "Personal"] },
+        "fromDate": { "type": "string", "maxLength": 50 },
+        "toDate": { "type": "string", "maxLength": 50 },
+        "reason": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Withdrawn"] },
+        "sessionRef": { "type": "string", "maxLength": 100 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "enrollmentNo",
+        "studentName",
+        "leaveType",
+        "fromDate",
+        "toDate",
+        "reason",
+        "status",
+        "ownerUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "Student administrative helpdesk ticket and reply thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketNo": { "type": "string", "maxLength": 40 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "enrollmentNo": { "type": "string", "maxLength": 64 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "maxLength": 100 },
+        "priority": { "type": "string", "enum": ["Normal", "High", "Urgent"] },
+        "subject": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved", "Closed"] },
+        "replies": { "type": "array", "maxItems": 50 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": [
+        "id",
+        "ticketNo",
+        "studentId",
+        "enrollmentNo",
+        "studentName",
+        "category",
+        "priority",
+        "subject",
+        "description",
+        "status",
+        "replies",
+        "ownerUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExamAttempt": {
+      "title": "Exam Attempt",
+      "description": "Protected online and hybrid examination session, proctoring logs, and locked responses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "examId": { "type": "string", "maxLength": 128 },
+        "examTitle": { "type": "string", "maxLength": 200 },
+        "subjectCode": { "type": "string", "maxLength": 30 },
+        "mode": { "type": "string", "enum": ["Online", "Offline", "Hybrid"] },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "enrollmentNo": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["In Progress", "Submitted"] },
+        "answersCount": { "type": "number", "minimum": 0, "maximum": 40 },
+        "answers": { "type": "object" },
+        "violationsCount": { "type": "number", "minimum": 0, "maximum": 10 },
+        "violationLogs": { "type": "array", "maxItems": 20 },
+        "proctorVerified": { "type": "boolean" },
+        "startedAt": { "type": "string", "maxLength": 60 },
+        "submittedAt": { "type": "string", "maxLength": 60 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "autoSubmitReason": { "type": "string", "maxLength": 160 },
+        "verificationHash": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": [
+        "id",
+        "examId",
+        "examTitle",
+        "subjectCode",
+        "mode",
+        "studentId",
+        "enrollmentNo",
+        "status",
+        "answersCount",
+        "answers",
+        "violationsCount",
+        "violationLogs",
+        "proctorVerified",
+        "startedAt",
+        "submittedAt",
+        "updatedAt",
+        "verificationHash",
+        "ownerUid"
+      ]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student profile documents"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Student assignments"
+    },
+    "/assignmentSubmissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/AssignmentSubmission" },
+      "description": "Student worksheet and assignment submissions"
+    },
+    "/feePayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/FeePayment" },
+      "description": "Fee payment installments and receipts"
+    },
+    "/leaveRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/LeaveRequest" },
+      "description": "Leave and attendance regularization requests"
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Helpdesk support tickets and reply threads"
+    },
+    "/examAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/ExamAttempt" },
+      "description": "Protected online and hybrid exam attempts and proctor logs"
+    }
+  }
+}

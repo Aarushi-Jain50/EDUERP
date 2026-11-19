@@ -28,43 +28,39 @@ Chart.register(...registerables);
   template: `
     <div class="space-y-8 lg:space-y-10">
 
-      <!-- 1. Spacious Welcome Hero Banner -->
-      <div class="gradient-brand text-white rounded-2xl p-6 lg:p-8 border border-white/15 shadow-lg relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <!-- Soft Ambient Aurora Radial Glow -->
+      <!-- 1. Executive Welcome Hero Banner -->
+      <div class="gradient-brand text-white rounded-xl p-6 lg:p-7 border border-slate-800/80 shadow-sm relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div class="absolute -top-24 -right-24 w-80 h-80 rounded-full aurora-glow pointer-events-none"></div>
 
-        <div class="flex items-start gap-5 relative z-10">
-          <div class="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 text-[#D946EF] flex items-center justify-center shrink-0 shadow-inner">
-            <span class="material-icons text-3xl">school</span>
+        <div class="flex items-start gap-4 relative z-10">
+          <div class="w-12 h-12 rounded-xl bg-white/10 border border-white/15 text-indigo-400 flex items-center justify-center shrink-0">
+            <span class="material-icons text-2xl">school</span>
           </div>
           <div class="space-y-1.5">
-            <div class="flex items-center gap-2.5 flex-wrap">
-              <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight">
-                Good Morning, <span class="text-[#D946EF]">Admin</span>
-              </h1>
-              <span class="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-pink-200 font-mono font-medium border border-white/15">
-                Dean (Academics)
-              </span>
-            </div>
-            <p class="text-xs text-purple-200 font-medium flex items-center gap-2">
-              <span class="material-icons text-sm text-[#D946EF]">calendar_today</span>
-              <span>{{ currentDate() }}</span>
-              <span class="text-white/40">·</span>
+            <div class="flex items-center gap-2.5 flex-wrap text-xs text-slate-300 font-medium">
+              <span class="text-indigo-300 font-semibold">Dean (Academics)</span>
+              <span class="text-slate-600" aria-hidden="true">/</span>
               <span>Academic Session 2025–26</span>
-              <span class="text-white/40">·</span>
-              <span>College Code: 133</span>
-            </p>
-            <p class="text-xs text-slate-300 max-w-xl leading-relaxed pt-1">
-              Apex Institute of Technology & Management. Real-time academic tracking, student attendance monitoring, examination schedules, and fee ledgers.
+              <span class="text-slate-600" aria-hidden="true">/</span>
+              <span class="font-mono text-slate-200">College Code 133</span>
+            </div>
+            <h1 class="font-display text-2xl lg:text-[26px] font-bold tracking-tight text-white">
+              Good Morning, <span class="text-indigo-400">Admin</span>
+            </h1>
+            <p class="text-xs text-slate-300 max-w-2xl leading-relaxed flex items-center gap-2 flex-wrap">
+              <span class="material-icons text-sm text-indigo-400">calendar_today</span>
+              <span>{{ currentDate() }}</span>
+              <span class="text-slate-600">·</span>
+              <span>Apex Institute of Technology & Management — Real-time academic tracking, attendance, examinations, and fee ledgers.</span>
             </p>
           </div>
         </div>
 
-        <!-- Primary Action CTAs with Generous Padding -->
+        <!-- Primary Action CTAs -->
         <div class="flex items-center gap-3 shrink-0 relative z-10 flex-wrap">
           <button
             (click)="openAddStudentModal()"
-            class="px-5 py-2.5 rounded-xl gradient-accent hover:opacity-95 text-white font-bold text-xs shadow-md shadow-purple-900/30 flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+            class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm flex items-center gap-2 cursor-pointer transition-colors active:scale-[0.98]"
           >
             <span class="material-icons text-base">person_add</span>
             <span>Add New Student</span>
@@ -72,7 +68,7 @@ Chart.register(...registerables);
 
           <button
             (click)="exportStudentsToCsv()"
-            class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/20 shadow-sm flex items-center gap-2 cursor-pointer transition-all"
+            class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/15 shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
             title="Export student records to CSV file"
           >
             <span class="material-icons text-sm">download</span>
@@ -81,21 +77,21 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <!-- 2. Four Clean, Spacious Key Metric Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <!-- 2. Four Key Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
         <!-- Metric 1: Total Enrolled Students -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Enrolled</span>
-            <div class="w-10 h-10 rounded-xl bg-purple-50 text-[#6D42E8] flex items-center justify-center">
-              <span class="material-icons text-xl">people</span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Enrolled</span>
+            <div class="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
+              <span class="material-icons text-lg">people</span>
             </div>
           </div>
           <div class="mt-4">
-            <h3 class="text-3xl font-extrabold text-[#172554] tracking-tight tabular-nums">{{ totalStudentsCount() }}</h3>
+            <h3 class="font-display text-[26px] font-bold text-slate-900 tracking-tight tabular-nums">{{ totalStudentsCount() }}</h3>
             <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span class="text-emerald-600 font-bold">+8.2%</span>
+              <span class="text-emerald-600 font-semibold">+8.2%</span>
               <span class="text-slate-300">·</span>
               <span>Active on university rolls</span>
             </div>
@@ -103,17 +99,17 @@ Chart.register(...registerables);
         </div>
 
         <!-- Metric 2: Today's Biometric Attendance -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Today's Attendance</span>
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <span class="material-icons text-xl">how_to_reg</span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Today's Attendance</span>
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+              <span class="material-icons text-lg">how_to_reg</span>
             </div>
           </div>
           <div class="mt-4">
-            <h3 class="text-3xl font-extrabold text-[#172554] tracking-tight tabular-nums">94.2%</h3>
+            <h3 class="font-display text-[26px] font-bold text-slate-900 tracking-tight tabular-nums">94.2%</h3>
             <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span class="text-emerald-600 font-bold">Optimal</span>
+              <span class="text-emerald-600 font-semibold">Optimal</span>
               <span class="text-slate-300">·</span>
               <span>Gate biometric verified</span>
             </div>
@@ -121,17 +117,17 @@ Chart.register(...registerables);
         </div>
 
         <!-- Metric 3: Attendance Defaulters -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Attendance Defaulters</span>
-            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <span class="material-icons text-xl">warning_amber</span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Attendance Defaulters</span>
+            <div class="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+              <span class="material-icons text-lg">warning_amber</span>
             </div>
           </div>
           <div class="mt-4">
-            <h3 class="text-3xl font-extrabold text-amber-600 tracking-tight tabular-nums">{{ defaulters().length }}</h3>
+            <h3 class="font-display text-[26px] font-bold text-amber-600 tracking-tight tabular-nums">{{ defaulters().length }}</h3>
             <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span class="text-amber-600 font-bold">&lt; 75% Rule</span>
+              <span class="text-amber-600 font-semibold">&lt; 75% Rule</span>
               <span class="text-slate-300">·</span>
               <span>Parent notices pending</span>
             </div>
@@ -139,17 +135,17 @@ Chart.register(...registerables);
         </div>
 
         <!-- Metric 4: Semester Fee Collection -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs hover:shadow-sm transition-shadow flex flex-col justify-between">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Semester Fee Collection</span>
-            <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <span class="material-icons text-xl">payments</span>
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Semester Fee Collection</span>
+            <div class="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center">
+              <span class="material-icons text-lg">payments</span>
             </div>
           </div>
           <div class="mt-4">
-            <h3 class="text-3xl font-extrabold text-[#172554] tracking-tight tabular-nums">₹1.48 Cr</h3>
+            <h3 class="font-display text-[26px] font-bold text-slate-900 tracking-tight tabular-nums">₹1.48 Cr</h3>
             <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span class="text-emerald-600 font-bold">89.4%</span>
+              <span class="text-emerald-600 font-semibold">89.4%</span>
               <span class="text-slate-300">·</span>
               <span>SBI i-Collect Synced</span>
             </div>
@@ -157,14 +153,14 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <!-- 3. Spacious 2-Column Analytics Charts Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- 3. 2-Column Analytics Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Chart 1: Enrollment Growth Trend -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-xs space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-6 shadow-xs space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-bold text-sm text-[#172554]">Student Enrollment Progression</h3>
+              <h3 class="font-display font-bold text-sm text-slate-900">Student Enrollment Progression</h3>
               <p class="text-xs text-slate-500 mt-0.5">5-year admission growth trajectory across academic disciplines</p>
             </div>
             <span class="text-xs font-medium text-slate-500">Verified AY 2022–26</span>
@@ -175,10 +171,10 @@ Chart.register(...registerables);
         </div>
 
         <!-- Chart 2: Weekly Biometric Attendance -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-xs space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-6 shadow-xs space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-bold text-sm text-[#172554]">Weekly Biometric Attendance Overview</h3>
+              <h3 class="font-display font-bold text-sm text-slate-900">Weekly Biometric Attendance Overview</h3>
               <p class="text-xs text-slate-500 mt-0.5">Daily attendance percentage recorded across biometric stations</p>
             </div>
             <span class="text-xs font-medium text-slate-500">Current Week (Mon–Sat)</span>
@@ -189,13 +185,13 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <!-- 4. Central Academic Directory & Student Records (Spacious, Uncluttered Table) -->
-      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <!-- 4. Central Academic Directory & Student Records -->
+      <div class="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
         
         <!-- Table Header & Filter Strip -->
         <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h3 class="font-extrabold text-base text-[#172554]">Student Academic Register & Records</h3>
+            <h3 class="font-display font-bold text-base text-slate-900">Student Academic Register & Records</h3>
             <p class="text-xs text-slate-500 mt-0.5">Verified university enrollment rolls, attendance records, and examination grades</p>
           </div>
 
@@ -243,7 +239,7 @@ Chart.register(...registerables);
                 placeholder="Search roll, name, program..."
                 [ngModel]="searchQuery()"
                 (ngModelChange)="searchQuery.set($event)"
-                class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6D42E8]/20 focus:border-[#6D42E8]"
+                class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
           </div>
@@ -267,7 +263,7 @@ Chart.register(...registerables);
               @for (student of filteredStudents(); track student.rollNo) {
                 <tr class="hover:bg-slate-50/80 transition-colors">
                   <!-- Roll No -->
-                  <td class="py-4 px-6 font-mono font-bold text-[#6D42E8]">
+                  <td class="py-4 px-6 font-mono font-bold text-indigo-600">
                     {{ student.rollNo }}
                   </td>
 
@@ -286,7 +282,7 @@ Chart.register(...registerables);
                   <!-- Attendance with Clear Indicator -->
                   <td class="py-4 px-6">
                     <div class="flex items-center gap-2">
-                      <span [class]="student.attendancePct >= 75 ? 'text-emerald-700 font-bold' : 'text-red-600 font-bold'">
+                      <span [class]="student.attendancePct >= 75 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'">
                         {{ student.attendancePct }}%
                       </span>
                       <span class="text-slate-400 text-[11px]">({{ student.lectureAttended }}/{{ student.lectureTotal }})</span>
@@ -294,13 +290,13 @@ Chart.register(...registerables);
                   </td>
 
                   <!-- CGPA -->
-                  <td class="py-4 px-6 font-mono font-bold text-slate-900">
+                  <td class="py-4 px-6 font-mono font-bold text-slate-900 tabular-nums">
                     {{ student.cgpa.toFixed(2) }}
                   </td>
 
                   <!-- Fee Status -->
                   <td class="py-4 px-6">
-                    <span [class]="student.feeStatus === 'Paid' ? 'text-emerald-700 font-bold' : 'text-red-600 font-bold'">
+                    <span [class]="student.feeStatus === 'Paid' ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'">
                       {{ student.feeStatus }}
                     </span>
                     <span class="text-[11px] text-slate-400 block font-mono">{{ student.challanNo }}</span>
@@ -310,7 +306,7 @@ Chart.register(...registerables);
                   <td class="py-4 px-6 text-right">
                     <button
                       (click)="viewDossier(student)"
-                      class="px-3 py-1.5 bg-white hover:bg-purple-50 text-[#6D42E8] border border-purple-200 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-2xs"
+                      class="px-3 py-1.5 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                     >
                       View Dossier
                     </button>
@@ -328,14 +324,14 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <!-- 5. Secondary Operational Grid (Spacious 2 Columns) -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- 5. Secondary Operational Grid (2 Columns) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Left: Low Attendance Alerts (< 75%) -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-xs space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-6 shadow-xs space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-bold text-sm text-[#172554] flex items-center gap-2">
+              <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
                 <span class="material-icons text-amber-500 text-base">warning</span>
                 <span>Low Attendance Defaulters (&lt; 75%)</span>
               </h3>
@@ -343,7 +339,7 @@ Chart.register(...registerables);
             </div>
             <button
               (click)="notifyAllDefaulters()"
-              class="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-xl border border-amber-200 cursor-pointer transition-colors"
+              class="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-lg border border-amber-200 cursor-pointer transition-colors"
             >
               Notify All Parents
             </button>
@@ -354,7 +350,7 @@ Chart.register(...registerables);
               <div class="py-3.5 flex items-center justify-between gap-4">
                 <div>
                   <div class="flex items-center gap-2">
-                    <span class="font-mono font-bold text-[#6D42E8]">{{ def.rollNo }}</span>
+                    <span class="font-mono font-bold text-indigo-600">{{ def.rollNo }}</span>
                     <span class="font-bold text-slate-800">{{ def.name }}</span>
                   </div>
                   <p class="text-[11px] text-slate-500 mt-0.5">
@@ -369,7 +365,7 @@ Chart.register(...registerables);
                   } @else {
                     <button
                       (click)="notifyDefaulter(def.rollNo)"
-                      class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-xs cursor-pointer transition-colors shadow-2xs"
+                      class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs cursor-pointer transition-colors"
                     >
                       Send SMS
                     </button>
@@ -381,23 +377,23 @@ Chart.register(...registerables);
         </div>
 
         <!-- Right: Upcoming University Examinations -->
-        <div class="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-xs space-y-4">
+        <div class="bg-white rounded-xl border border-slate-200/90 p-6 shadow-xs space-y-4">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-bold text-sm text-[#172554] flex items-center gap-2">
-                <span class="material-icons text-[#D946EF] text-base">assignment</span>
+              <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
+                <span class="material-icons text-indigo-600 text-base">assignment</span>
                 <span>Upcoming Examination Schedule</span>
               </h3>
               <p class="text-xs text-slate-500 mt-0.5">End-Term Theory & Practical dates for current session</p>
             </div>
-            <span class="text-xs font-semibold text-[#6D42E8]">Even Sem 2026</span>
+            <span class="text-xs font-semibold text-indigo-600">Even Sem 2026</span>
           </div>
 
           <div class="space-y-3">
             @for (exam of examSchedules().slice(0, 3); track exam.courseCode) {
-              <div class="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-purple-50/20 transition-colors">
+              <div class="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-indigo-50/30 transition-colors">
                 <div class="flex items-center justify-between">
-                  <span class="font-mono font-bold text-[#6D42E8] text-xs">{{ exam.courseCode }}</span>
+                  <span class="font-mono font-bold text-indigo-600 text-xs">{{ exam.courseCode }}</span>
                   <span class="text-xs text-slate-500 font-medium">{{ exam.date }}</span>
                 </div>
                 <h4 class="font-bold text-slate-800 text-xs mt-1">{{ exam.subject }}</h4>
@@ -413,18 +409,18 @@ Chart.register(...registerables);
       </div>
 
       <!-- Recent System Activity Snapshot -->
-      <div class="bg-white rounded-2xl border border-slate-200/90 p-7 shadow-xs space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200/90 p-6 shadow-xs space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <h3 class="font-bold text-sm text-[#172554] flex items-center gap-2">
-              <span class="material-icons text-[#6D42E8] text-base">history</span>
+            <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
+              <span class="material-icons text-indigo-600 text-base">history</span>
               <span>Recent Activity</span>
             </h3>
             <p class="text-xs text-slate-500 mt-0.5">Chronological audit trail of administrative actions, fee collections, and notices</p>
           </div>
           <a
             routerLink="/admin/recent-activity"
-            class="text-xs font-bold text-[#6D42E8] hover:text-[#582fc4] hover:underline flex items-center gap-1 cursor-pointer"
+            class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline flex items-center gap-1 cursor-pointer"
           >
             <span>View all</span>
             <span class="material-icons text-sm">arrow_forward</span>
@@ -433,9 +429,9 @@ Chart.register(...registerables);
         
         <div class="divide-y divide-slate-100 text-xs">
           @for (item of recentActivityPreview(); track item.id) {
-            <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 rounded-lg px-2 transition-colors">
+            <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 rounded-lg px-2 transition-colors">
               <div class="flex items-center gap-3 min-w-0">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-purple-50 text-[#6D42E8] border border-purple-100">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-indigo-50 text-indigo-600 border border-indigo-100">
                   <span class="material-icons text-base">{{ item.icon }}</span>
                 </div>
                 <div class="truncate">
@@ -448,46 +444,46 @@ Chart.register(...registerables);
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0 pl-11 sm:pl-0">
-                <span class="text-xs text-[#64748B] font-normal whitespace-nowrap">{{ item.relativeTime }}</span>
+                <span class="text-xs text-slate-500 font-normal whitespace-nowrap">{{ item.relativeTime }}</span>
               </div>
             </div>
           }
         </div>
       </div>
 
-      <!-- 6. Quick Administrative Actions (3 Spacious Cards) -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+      <!-- 6. Quick Administrative Actions (3 Cards) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
         
         <button
           (click)="openAddStudentModal()"
-          class="p-6 rounded-2xl border border-slate-200/90 bg-white hover:border-[#6D42E8] hover:shadow-md transition-all text-left group cursor-pointer"
+          class="p-5 rounded-xl border border-slate-200/90 bg-white hover:border-indigo-300 hover:shadow-sm transition-all text-left group cursor-pointer"
         >
-          <div class="w-12 h-12 rounded-xl bg-purple-50 text-[#6D42E8] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <span class="material-icons text-2xl">person_add</span>
+          <div class="w-11 h-11 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <span class="material-icons text-xl">person_add</span>
           </div>
-          <h4 class="font-bold text-sm text-slate-900 group-hover:text-[#6D42E8] transition-colors mt-4">Enroll New Student</h4>
+          <h4 class="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors mt-3.5">Enroll New Student</h4>
           <p class="text-xs text-slate-500 mt-1 leading-relaxed">Register new candidates to university roster with SBI Challan verification</p>
         </button>
 
         <button
           (click)="openPublishNoticeModal()"
-          class="p-6 rounded-2xl border border-slate-200/90 bg-white hover:border-[#6D42E8] hover:shadow-md transition-all text-left group cursor-pointer"
+          class="p-5 rounded-xl border border-slate-200/90 bg-white hover:border-indigo-300 hover:shadow-sm transition-all text-left group cursor-pointer"
         >
-          <div class="w-12 h-12 rounded-xl bg-pink-50 text-[#D946EF] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <span class="material-icons text-2xl">campaign</span>
+          <div class="w-11 h-11 rounded-lg bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <span class="material-icons text-xl">campaign</span>
           </div>
-          <h4 class="font-bold text-sm text-slate-900 group-hover:text-[#6D42E8] transition-colors mt-4">Publish Circular</h4>
+          <h4 class="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors mt-3.5">Publish Circular</h4>
           <p class="text-xs text-slate-500 mt-1 leading-relaxed">Broadcast official academic notifications and exam timetables to student portal</p>
         </button>
 
         <button
           (click)="syncBiometricTerminal()"
-          class="p-6 rounded-2xl border border-slate-200/90 bg-white hover:border-[#6D42E8] hover:shadow-md transition-all text-left group cursor-pointer"
+          class="p-5 rounded-xl border border-slate-200/90 bg-white hover:border-indigo-300 hover:shadow-sm transition-all text-left group cursor-pointer"
         >
-          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
-            <span class="material-icons text-2xl">sync</span>
+          <div class="w-11 h-11 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <span class="material-icons text-xl">sync</span>
           </div>
-          <h4 class="font-bold text-sm text-slate-900 group-hover:text-[#6D42E8] transition-colors mt-4">Sync Biometric Logs</h4>
+          <h4 class="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors mt-3.5">Sync Biometric Logs</h4>
           <p class="text-xs text-slate-500 mt-1 leading-relaxed">Pull live RFID attendance records from Gate 1 and Gate 2 hardware stations</p>
         </button>
       </div>
@@ -502,17 +498,17 @@ Chart.register(...registerables);
           
           <div class="flex items-center justify-between border-b border-slate-200 pb-4">
             <div class="flex items-center gap-3.5">
-              <div class="w-12 h-12 rounded-xl gradient-accent text-white flex items-center justify-center font-extrabold text-lg shadow-sm">
+              <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-xs">
                 {{ selectedStudent()!.name.charAt(0) }}
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="px-2.5 py-0.5 rounded bg-purple-100 text-[#6D42E8] font-mono font-bold text-xs">
+                  <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-mono font-bold text-xs border border-indigo-200">
                     Roll: {{ selectedStudent()!.rollNo }}
                   </span>
                   <span class="text-[11px] text-slate-500 font-mono">PRN: 2024-MCA-{{ selectedStudent()!.rollNo }}</span>
                 </div>
-                <h3 class="text-base font-extrabold text-slate-900 mt-0.5">{{ selectedStudent()!.name }}</h3>
+                <h3 class="text-base font-bold text-slate-900 mt-0.5">{{ selectedStudent()!.name }}</h3>
               </div>
             </div>
             <button (click)="selectedStudent.set(null)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
@@ -534,21 +530,21 @@ Chart.register(...registerables);
             </div>
             <div>
               <p class="text-[10px] font-bold text-slate-400 uppercase">ATTENDANCE</p>
-              <p [class]="selectedStudent()!.attendancePct >= 75 ? 'font-bold text-emerald-600 text-xs mt-0.5' : 'font-bold text-red-600 text-xs mt-0.5'">
+              <p [class]="selectedStudent()!.attendancePct >= 75 ? 'font-bold text-emerald-600 text-xs mt-0.5' : 'font-bold text-rose-600 text-xs mt-0.5'">
                 {{ selectedStudent()!.attendancePct }}% ({{ selectedStudent()!.lectureAttended }}/{{ selectedStudent()!.lectureTotal }})
               </p>
               <p class="text-[10px] text-slate-500">{{ selectedStudent()!.attendancePct >= 75 ? 'Exam Eligible' : 'Detained Warning' }}</p>
             </div>
             <div>
               <p class="text-[10px] font-bold text-slate-400 uppercase">CUMULATIVE CGPA</p>
-              <p class="font-bold text-[#6D42E8] font-mono text-base mt-0.5">{{ selectedStudent()!.cgpa.toFixed(2) }} / 10.0</p>
+              <p class="font-bold text-indigo-600 font-mono text-base mt-0.5">{{ selectedStudent()!.cgpa.toFixed(2) }} / 10.0</p>
             </div>
           </div>
 
           <!-- Semester IV Subject Marksheet -->
           <div>
             <h4 class="font-bold text-slate-800 text-xs uppercase mb-2 flex items-center gap-1.5">
-              <span class="material-icons text-sm text-[#6D42E8]">grade</span>
+              <span class="material-icons text-sm text-indigo-600">grade</span>
               <span>Semester IV Theory & Practical Marksheet:</span>
             </h4>
             <div class="overflow-x-auto rounded-xl border border-slate-200">
@@ -564,25 +560,25 @@ Chart.register(...registerables);
                 </thead>
                 <tbody class="divide-y divide-slate-100 font-medium">
                   <tr>
-                    <td class="p-3 font-mono text-[#6D42E8] font-bold">KCA-401</td>
+                    <td class="p-3 font-mono text-indigo-600 font-bold">KCA-401</td>
                     <td class="p-3">Cloud Computing Architecture & DevOps</td>
                     <td class="p-3 font-mono">28 / 30</td>
                     <td class="p-3 font-mono">61 / 70</td>
                     <td class="p-3 font-bold text-emerald-600">A+</td>
                   </tr>
                   <tr>
-                    <td class="p-3 font-mono text-[#6D42E8] font-bold">KCA-402</td>
+                    <td class="p-3 font-mono text-indigo-600 font-bold">KCA-402</td>
                     <td class="p-3">Artificial Intelligence & Deep Learning</td>
                     <td class="p-3 font-mono">27 / 30</td>
                     <td class="p-3 font-mono">59 / 70</td>
                     <td class="p-3 font-bold text-emerald-600">A+</td>
                   </tr>
                   <tr>
-                    <td class="p-3 font-mono text-[#6D42E8] font-bold">KCA-452</td>
+                    <td class="p-3 font-mono text-indigo-600 font-bold">KCA-452</td>
                     <td class="p-3">Major Project Dissertation & Final Viva</td>
                     <td class="p-3 font-mono">29 / 30</td>
                     <td class="p-3 font-mono">66 / 70</td>
-                    <td class="p-3 font-bold text-purple-700">O (Outstanding)</td>
+                    <td class="p-3 font-bold text-indigo-700">O (Outstanding)</td>
                   </tr>
                 </tbody>
               </table>
@@ -595,12 +591,12 @@ Chart.register(...registerables);
               <p class="font-bold text-emerald-900 text-xs">University Fee Status: {{ selectedStudent()!.feeStatus }}</p>
               <p class="text-[11px] text-emerald-700 mt-0.5">Challan Ref: <span class="font-mono font-bold">{{ selectedStudent()!.challanNo }}</span> (Amount: {{ selectedStudent()!.feePaidAmount }})</p>
             </div>
-            <span class="px-2.5 py-1 bg-emerald-200 text-emerald-900 rounded font-bold text-xs">Accounts Verified</span>
+            <span class="px-2.5 py-1 bg-emerald-200 text-emerald-900 rounded-md font-bold text-xs">Accounts Verified</span>
           </div>
 
           <div class="flex justify-end gap-3 pt-3 border-t border-slate-200">
             <button (click)="selectedStudent.set(null)" class="px-4 py-2 border border-slate-300 rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">Close</button>
-            <button (click)="printDossier()" class="px-5 py-2 gradient-accent text-white font-bold rounded-xl shadow-sm cursor-pointer flex items-center gap-2">
+            <button (click)="printDossier()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer flex items-center gap-2 transition-colors">
               <span class="material-icons text-sm">print</span> Print Official Marksheet
             </button>
           </div>
@@ -611,12 +607,12 @@ Chart.register(...registerables);
     <!-- Modal 2: Add New Candidate Admission Modal -->
     @if (isAddStudentOpen()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button type="button" aria-label="Close modal overlay" (click)="isAddStudentOpen.set(false)" class="fixed inset-0 bg-black/60 backdrop-blur-xs w-full h-full border-0"></button>
+        <button type="button" aria-label="Close modal overlay" (click)="isAddStudentOpen.set(false)" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs w-full h-full border-0"></button>
         <div class="relative bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg z-10 space-y-4 text-xs text-slate-800 max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between border-b border-slate-200 pb-3">
             <div class="flex items-center gap-2">
-              <span class="material-icons text-[#6D42E8]">person_add</span>
-              <h3 class="text-base font-extrabold text-[#172554]">Enroll Candidate to University Roster</h3>
+              <span class="material-icons text-indigo-600">person_add</span>
+              <h3 class="text-base font-bold text-slate-900">Enroll Candidate to University Roster</h3>
             </div>
             <button (click)="isAddStudentOpen.set(false)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
               <span class="material-icons">close</span>
@@ -627,11 +623,11 @@ Chart.register(...registerables);
             <div class="grid grid-cols-2 gap-3.5">
               <div>
                 <label for="enroll-roll" class="block font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">University Roll No *</label>
-                <input id="enroll-roll" type="text" [(ngModel)]="newStudentData.rollNo" name="rollNo" placeholder="e.g. 22MCA064" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#6D42E8]/20" />
+                <input id="enroll-roll" type="text" [(ngModel)]="newStudentData.rollNo" name="rollNo" placeholder="e.g. 22MCA064" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
               </div>
               <div>
                 <label for="enroll-name" class="block font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Student Full Name *</label>
-                <input id="enroll-name" type="text" [(ngModel)]="newStudentData.name" name="name" placeholder="e.g. Ananya Das" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#6D42E8]/20" />
+                <input id="enroll-name" type="text" [(ngModel)]="newStudentData.name" name="name" placeholder="e.g. Ananya Das" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
               </div>
             </div>
 
@@ -678,7 +674,7 @@ Chart.register(...registerables);
 
             <div class="flex justify-end gap-3 pt-3 border-t border-slate-200">
               <button type="button" (click)="isAddStudentOpen.set(false)" class="px-4 py-2 border border-slate-300 rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">Cancel</button>
-              <button type="submit" class="px-5 py-2 gradient-accent text-white font-bold rounded-xl shadow-sm hover:opacity-95 cursor-pointer">Confirm Admission</button>
+              <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer transition-colors">Confirm Admission</button>
             </div>
           </form>
         </div>
@@ -688,12 +684,12 @@ Chart.register(...registerables);
     <!-- Modal 3: Publish Institutional Circular -->
     @if (isNoticeModalOpen()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <button type="button" aria-label="Close modal overlay" (click)="isNoticeModalOpen.set(false)" class="fixed inset-0 bg-black/60 backdrop-blur-xs w-full h-full border-0"></button>
+        <button type="button" aria-label="Close modal overlay" (click)="isNoticeModalOpen.set(false)" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs w-full h-full border-0"></button>
         <div class="relative bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg z-10 space-y-4 text-xs text-slate-800">
           <div class="flex items-center justify-between border-b border-slate-200 pb-3">
             <div class="flex items-center gap-2">
-              <span class="material-icons text-[#D946EF]">campaign</span>
-              <h3 class="text-base font-extrabold text-[#172554]">Publish Official College Circular</h3>
+              <span class="material-icons text-indigo-600">campaign</span>
+              <h3 class="text-base font-bold text-slate-900">Publish Official College Circular</h3>
             </div>
             <button (click)="isNoticeModalOpen.set(false)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
               <span class="material-icons">close</span>
@@ -703,7 +699,7 @@ Chart.register(...registerables);
           <form (submit)="submitNewNotice($event)" class="space-y-4">
             <div>
               <label for="circ-title" class="block font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Circular Title *</label>
-              <input id="circ-title" type="text" [(ngModel)]="newNoticeData.title" name="title" placeholder="e.g. Schedule of MCA Major Project Final Defense" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs" />
+              <input id="circ-title" type="text" [(ngModel)]="newNoticeData.title" name="title" placeholder="e.g. Schedule of MCA Major Project Final Defense" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" />
             </div>
 
             <div class="grid grid-cols-2 gap-3.5">
@@ -726,12 +722,12 @@ Chart.register(...registerables);
 
             <div>
               <label for="circ-content" class="block font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1">Notice Content *</label>
-              <textarea id="circ-content" rows="3" [(ngModel)]="newNoticeData.content" name="content" placeholder="Enter circular details, deadlines, and instructions..." required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"></textarea>
+              <textarea id="circ-content" rows="3" [(ngModel)]="newNoticeData.content" name="content" placeholder="Enter circular details, deadlines, and instructions..." required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"></textarea>
             </div>
 
             <div class="flex justify-end gap-3 pt-3 border-t border-slate-200">
               <button type="button" (click)="isNoticeModalOpen.set(false)" class="px-4 py-2 border border-slate-300 rounded-xl font-semibold hover:bg-slate-50 cursor-pointer">Cancel</button>
-              <button type="submit" class="px-5 py-2 gradient-accent text-white font-bold rounded-xl shadow-sm hover:opacity-95 cursor-pointer">Broadcast Notice</button>
+              <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-xs cursor-pointer transition-colors">Broadcast Notice</button>
             </div>
           </form>
         </div>
@@ -740,8 +736,8 @@ Chart.register(...registerables);
 
     <!-- Toast Notification -->
     @if (toastMessage()) {
-      <div class="fixed bottom-6 right-6 z-50 bg-[#1A1745] text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-3 text-xs animate-bounce">
-        <span class="material-icons text-emerald-400">check_circle</span>
+      <div class="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-800 flex items-center gap-2.5 text-xs font-medium">
+        <span class="material-icons text-emerald-400 text-base">check_circle</span>
         <span>{{ toastMessage() }}</span>
       </div>
     }
@@ -848,8 +844,8 @@ export class DashboardOverview {
             {
               label: 'MCA & IT Applications',
               data: [320, 390, 480, 560, 680],
-              borderColor: '#6D42E8',
-              backgroundColor: 'rgba(109, 66, 232, 0.1)',
+              borderColor: '#4F46E5',
+              backgroundColor: 'rgba(79, 70, 229, 0.1)',
               fill: true,
               tension: 0.35,
               borderWidth: 2.5
@@ -857,8 +853,8 @@ export class DashboardOverview {
             {
               label: 'B.Tech Engg Programs',
               data: [1800, 2100, 2450, 2900, 3400],
-              borderColor: '#D946EF',
-              backgroundColor: 'rgba(217, 70, 239, 0.06)',
+              borderColor: '#0EA5E9',
+              backgroundColor: 'rgba(14, 165, 233, 0.08)',
               fill: true,
               tension: 0.35,
               borderWidth: 2.5
@@ -872,7 +868,7 @@ export class DashboardOverview {
             legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
           },
           scales: {
-            y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 } } },
+            y: { grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
             x: { grid: { display: false }, ticks: { font: { size: 10 } } }
           }
         }
@@ -889,7 +885,7 @@ export class DashboardOverview {
             {
               label: 'Daily Biometric %',
               data: [96.2, 94.8, 95.1, 93.6, 94.2, 91.5],
-              backgroundColor: '#6D42E8',
+              backgroundColor: '#4F46E5',
               borderRadius: 6
             }
           ]

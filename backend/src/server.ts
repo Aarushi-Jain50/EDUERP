@@ -3,6 +3,7 @@ import cors from 'cors';
 import academicRoutes from './routes/academic.routes';
 import peopleRoutes from './routes/people.routes';
 import authUserRoutes from './routes/auth-users.routes';
+import studentWorkspaceRoutes from './routes/student-workspace.routes';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,6 +15,7 @@ app.use(express.json());
 app.use('/api/v1/academic', academicRoutes);
 app.use('/api/v1/people', peopleRoutes);
 app.use('/api/v1/auth', authUserRoutes);
+app.use('/api/v1/student-workspace', studentWorkspaceRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'EduERP Express Backend', timestamp: new Date().toISOString() });

@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { Login } from './pages/login/login';
 import { Register } from './pages/register/register';
+import { AdminSecureLogin } from './pages/admin-secure-login/admin-secure-login';
+import { AccessDeniedPage } from './pages/access-denied/access-denied';
 import { AdminDashboardLayout } from './pages/admin-dashboard/admin-dashboard-layout';
 import { DashboardOverview } from './pages/admin-dashboard/dashboard-overview';
 import { RecentActivity } from './pages/admin-dashboard/recent-activity/recent-activity';
@@ -43,16 +45,38 @@ import { ActivityHistoryPage } from './pages/admin-dashboard/activity-history/ac
 import { MyProfilePage } from './pages/admin-dashboard/my-profile/my-profile';
 import { MisterMasonComponent } from './pages/mister-mason/mister-mason';
 
+import { FacultyLayout } from './pages/faculty/faculty-layout';
+import { FacultyDashboardPage } from './pages/faculty/dashboard/faculty-dashboard';
+import { FacultyMyClassesPage } from './pages/faculty/my-classes/faculty-my-classes';
+import { FacultyClassDetailPage } from './pages/faculty/my-classes/faculty-class-detail';
+import { FacultyTimetablePage } from './pages/faculty/timetable/faculty-timetable';
+import { FacultyAttendancePage } from './pages/faculty/attendance/faculty-attendance';
+import { FacultyAssignmentsPage } from './pages/faculty/assignments/faculty-assignments';
+import { FacultyAssignmentSubmissionsPage } from './pages/faculty/assignments/faculty-assignment-submissions';
+import { FacultyResultsMarksPage } from './pages/faculty/results/faculty-results-marks';
+import { FacultyStudentsPage } from './pages/faculty/students/faculty-students';
+import { FacultyNoticesPage } from './pages/faculty/notices/faculty-notices';
+import { FacultyMessageCenterPage } from './pages/faculty/message-center/faculty-message-center';
+import { FacultyMyProfilePage } from './pages/faculty/my-profile/faculty-my-profile';
+import { DashboardShell } from './pages/dashboard-shell/dashboard-shell';
+import { authGuard, authChildGuard, authMatchGuard, guestGuard } from './guards/auth.guard';
+import { roleGuard, roleChildGuard, dashboardRedirectGuard } from './guards/role.guard';
+
 export const routes: Routes = [
-  { path: 'login', component: Login },
-  { path: 'register', component: Register },
+  { path: 'login', component: Login, canActivate: [guestGuard] },
+  { path: 'register', component: Register, canActivate: [guestGuard] },
+  { path: 'access-denied', component: AccessDeniedPage },
+  { path: 'admin/secure-login', component: AdminSecureLogin },
   { path: 'mistermason', component: MisterMasonComponent },
   { path: 'project2', component: MisterMasonComponent },
   {
     path: 'admin',
     component: AdminDashboardLayout,
+    canActivate: [authGuard, roleGuard(['admin', 'superadmin'])],
+    canActivateChild: [authChildGuard, roleChildGuard(['admin', 'superadmin'])],
     children: [
-      { path: '', redirectTo: 'overview', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'dashboard', component: DashboardOverview },
       { path: 'overview', component: DashboardOverview },
       { path: 'recent-activity', component: RecentActivity },
       { path: 'academic-years', component: AcademicYearsPage },
@@ -95,10 +119,52 @@ export const routes: Routes = [
     ]
   },
   {
+    path: 'faculty',
+    component: FacultyLayout,
+    canActivate: [authGuard, roleGuard(['faculty'])],
+    canActivateChild: [authChildGuard, roleChildGuard(['faculty'])],
+    children: [
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'dashboard', component: FacultyDashboardPage },
+      { path: 'my-classes', component: FacultyMyClassesPage },
+      { path: 'my-classes/:allocationId', component: FacultyClassDetailPage },
+      { path: 'timetable', component: FacultyTimetablePage },
+      { path: 'attendance', component: FacultyAttendancePage },
+      { path: 'assignments', component: FacultyAssignmentsPage },
+      { path: 'assignments/:assignmentId/submissions', component: FacultyAssignmentSubmissionsPage },
+      { path: 'results-marks', component: FacultyResultsMarksPage },
+      { path: 'my-students', component: FacultyStudentsPage },
+      { path: 'notices', component: FacultyNoticesPage },
+      { path: 'message-center', component: FacultyMessageCenterPage },
+      { path: 'messages', redirectTo: 'message-center' },
+      { path: 'my-profile', component: FacultyMyProfilePage },
+      { path: 'profile', redirectTo: 'my-profile' }
+    ]
+  },
+  {
+    path: 'student',
+    canMatch: [authMatchGuard],
+    canActivate: [authGuard, roleGuard(['student'])],
+    canActivateChild: [authChildGuard, roleChildGuard(['student'])],
+    loadChildren: () => import('./pages/student/student.routes').then(m => m.STUDENT_ROUTES)
+  },
+  {
+    path: 'parent',
+    canMatch: [authMatchGuard],
+    canActivate: [authGuard, roleGuard(['parent'])],
+    canActivateChild: [authChildGuard, roleChildGuard(['parent'])],
+    loadChildren: () => import('./pages/parent/parent.routes').then(m => m.PARENT_ROUTES)
+  },
+  {
+    path: 'portal',
+    redirectTo: 'parent/dashboard',
+    pathMatch: 'full'
+  },
+  {
     path: 'dashboard',
-    redirectTo: 'admin'
+    component: DashboardShell,
+    canActivate: [authGuard, dashboardRedirectGuard]
   },
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: '**', redirectTo: 'login' }
 ];
-

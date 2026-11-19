@@ -10,18 +10,26 @@ import {join} from 'node:path';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
-const angularApp = new AngularNodeAppEngine();
+const angularApp = new AngularNodeAppEngine({ allowedHosts: ['*'] });
 
 import academicRoutes from '../../backend/src/routes/academic.routes';
 import peopleRoutes from '../../backend/src/routes/people.routes';
 import authUserRoutes from '../../backend/src/routes/auth-users.routes';
+import studentWorkspaceRoutes from '../../backend/src/routes/student-workspace.routes';
+
+app.set('trust proxy', 1);
+app.use('/api', express.json({ limit: '1mb' }));
 
 // Mount Backend REST API Routes
 app.use('/api/v1/academic', academicRoutes);
 app.use('/api/v1/people', peopleRoutes);
 app.use('/api/v1/auth', authUserRoutes);
+app.use('/api/v1/student-workspace', studentWorkspaceRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'EduERP Fullstack Server', timestamp: new Date().toISOString() });
+});
+app.use('/api', (_req, res) => {
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
 });
 
 /**

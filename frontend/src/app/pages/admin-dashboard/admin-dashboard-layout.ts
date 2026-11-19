@@ -1,7 +1,10 @@
-import { ChangeDetectionStrategy, Component, signal, inject, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal, inject, computed, OnInit, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { NotificationService } from '../../services/notification.service';
+import { CurrentUserService } from '../../services/current-user.service';
+import { AuthSessionService } from '../../services/auth-session.service';
 
 interface MenuItem {
   title: string;
@@ -21,10 +24,10 @@ interface MenuSection {
   selector: 'app-admin-dashboard-layout',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   template: `
-    <div class="h-screen flex flex-col font-sans bg-[#F5F6FF] text-[#172554] overflow-hidden">
+    <div class="h-screen flex flex-col font-sans bg-[#F8FAFC] text-slate-900 overflow-hidden">
 
       <!-- 1. Top Navigation Bar (Fixed at top, shrink-0) -->
-      <header class="bg-[#1A1745] text-white h-16 px-4 lg:px-6 flex items-center justify-between border-b border-white/10 shrink-0 z-30 shadow-md">
+      <header class="bg-[#0F172A] text-white h-16 px-4 lg:px-6 flex items-center justify-between border-b border-white/10 shrink-0 z-30 shadow-md">
         <!-- Left: Brand Logo & Mobile Toggle & Page Title / Breadcrumbs -->
         <div class="flex items-center gap-4">
           <button
@@ -37,12 +40,12 @@ interface MenuSection {
 
           <!-- Brand Logo -->
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-purple-900/40 shrink-0">
+            <div class="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center shadow-lg shadow-indigo-950/30 shrink-0">
               <span class="material-icons text-white text-2xl">school</span>
             </div>
             <div>
               <div class="flex items-center">
-                <span class="font-extrabold text-lg tracking-tight text-white">Edu<span class="text-[#D946EF]">ERP</span></span>
+                <span class="font-extrabold text-lg tracking-tight text-white">Edu<span class="text-indigo-400">ERP</span></span>
               </div>
             </div>
           </div>
@@ -53,7 +56,7 @@ interface MenuSection {
           <!-- Page Title Breadcrumb -->
           <div class="hidden md:flex items-center text-xs">
             <span class="font-bold text-white flex items-center gap-1.5">
-              <span class="material-icons text-sm text-[#D946EF]">space_dashboard</span>
+              <span class="material-icons text-sm text-indigo-400">space_dashboard</span>
               <span>Admin Dashboard</span>
             </span>
           </div>
@@ -70,7 +73,7 @@ interface MenuSection {
               placeholder="Search students, faculty, courses, transactions (Press '/' to focus)..."
               [ngModel]="globalSearch()"
               (ngModelChange)="globalSearch.set($event)"
-              class="w-full bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 placeholder-slate-400 focus:placeholder-slate-500 rounded-xl pl-10 pr-10 py-1.5 text-xs transition-all border border-white/10 focus:border-[#6D42E8] focus:outline-none shadow-inner"
+              class="w-full bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 placeholder-slate-400 focus:placeholder-slate-500 rounded-xl pl-10 pr-10 py-1.5 text-xs transition-all border border-white/10 focus:border-indigo-600 focus:outline-none shadow-inner"
             />
             @if (globalSearch()) {
               <button
@@ -97,7 +100,7 @@ interface MenuSection {
             >
               <span class="material-icons text-lg">notifications</span>
               @if (unreadNotificationsCount() > 0) {
-                <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#D946EF] text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                   {{ unreadNotificationsCount() }}
                 </span>
               }
@@ -106,14 +109,14 @@ interface MenuSection {
             @if (isNotificationsOpen()) {
               <div class="absolute right-0 mt-2 w-80 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 p-3 z-50 text-xs">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span class="font-extrabold text-xs text-[#172554]">System Notifications</span>
-                  <button (click)="markAllAsRead()" class="text-[11px] text-[#6D42E8] font-bold hover:underline cursor-pointer">Mark all read</button>
+                  <span class="font-extrabold text-xs text-slate-900">System Notifications</span>
+                  <button (click)="markAllAsRead()" class="text-[11px] text-indigo-600 font-bold hover:underline cursor-pointer">Mark all read</button>
                 </div>
                 <div class="divide-y divide-slate-100 max-h-64 overflow-y-auto mt-1">
                   @for (n of notifications(); track n.id) {
-                    <div class="py-2.5 px-2 hover:bg-purple-50/50 rounded-lg transition-colors">
+                    <div class="py-2.5 px-2 hover:bg-indigo-50/50 rounded-lg transition-colors">
                       <div class="flex items-start gap-2.5">
-                        <span class="material-icons text-base text-[#6D42E8] mt-0.5">{{ n.icon }}</span>
+                        <span class="material-icons text-base text-indigo-600 mt-0.5">{{ n.icon }}</span>
                         <div>
                           <p class="font-bold text-slate-900 text-xs">{{ n.title }}</p>
                           <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">{{ n.description }}</p>
@@ -124,7 +127,7 @@ interface MenuSection {
                   }
                 </div>
                 <div class="pt-2 border-t border-slate-100 text-center">
-                  <a routerLink="/admin/notifications" (click)="isNotificationsOpen.set(false)" class="text-xs font-bold text-[#6D42E8] hover:underline">
+                  <a routerLink="/admin/notifications" (click)="isNotificationsOpen.set(false)" class="text-xs font-bold text-indigo-600 hover:underline">
                     View all notifications →
                   </a>
                 </div>
@@ -138,15 +141,15 @@ interface MenuSection {
               (click)="isSessionDropdownOpen.set(!isSessionDropdownOpen())"
               class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-100 border border-white/10 transition-colors cursor-pointer"
             >
-              <span class="material-icons text-sm text-[#D946EF]">calendar_today</span>
+              <span class="material-icons text-sm text-indigo-400">calendar_today</span>
               <span>AY 2025-26</span>
               <span class="material-icons text-xs text-slate-400">arrow_drop_down</span>
             </button>
             @if (isSessionDropdownOpen()) {
               <div class="absolute right-0 mt-1.5 w-52 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 py-2 z-50 text-xs">
                 <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Academic Sessions</div>
-                <button (click)="isSessionDropdownOpen.set(false)" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-purple-50 text-slate-800 cursor-pointer">
-                  <span class="material-icons text-sm text-[#6D42E8]">check_circle</span> AY 2025-26 (Active)
+                <button (click)="isSessionDropdownOpen.set(false)" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-indigo-50 text-slate-800 cursor-pointer">
+                  <span class="material-icons text-sm text-indigo-600">check_circle</span> AY 2025-26 (Active)
                 </button>
                 <button (click)="isSessionDropdownOpen.set(false)" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-600 cursor-pointer">
                   <span class="material-icons text-sm text-slate-400">history</span> AY 2024-25 (Archived)
@@ -162,14 +165,14 @@ interface MenuSection {
               aria-label="Open user profile menu"
               class="flex items-center gap-2.5 pl-2 py-1 pr-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
             >
-              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#6D42E8] to-[#D946EF] p-0.5 shrink-0 shadow-sm">
-                <div class="w-full h-full rounded-full bg-[#1A1745] flex items-center justify-center text-xs font-bold text-white">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-indigo-600 p-0.5 shrink-0 shadow-sm">
+                <div class="w-full h-full rounded-full bg-[#0F172A] flex items-center justify-center text-xs font-bold text-white">
                   AD
                 </div>
               </div>
               <div class="hidden xl:block text-left">
                 <p class="text-xs font-bold text-white leading-tight">Administrator</p>
-                <p class="text-[10px] text-pink-300 font-semibold uppercase tracking-wider">SUPER ADMIN</p>
+                <p class="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider">SUPER ADMIN</p>
               </div>
               <span class="material-icons text-xs text-slate-400 hidden xl:block">expand_more</span>
             </button>
@@ -177,16 +180,16 @@ interface MenuSection {
             @if (isProfileDropdownOpen()) {
               <div class="absolute right-0 mt-2 w-56 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 text-xs">
                 <div class="px-4 py-2 border-b border-slate-100">
-                  <p class="font-bold text-slate-900">admin&#64;eduerp.edu</p>
+                  <p class="font-bold text-slate-900">{{ adminEmail() }}</p>
                   <p class="text-[10px] text-slate-500 font-medium">Logged in as ERP Administrator</p>
                 </div>
-                <a routerLink="/admin/profile" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-purple-50 text-slate-700 hover:text-[#6D42E8] cursor-pointer">
+                <a routerLink="/admin/profile" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 cursor-pointer">
                   <span class="material-icons text-sm">person</span> My Profile
                 </a>
-                <a routerLink="/admin/settings" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-purple-50 text-slate-700 hover:text-[#6D42E8] cursor-pointer">
+                <a routerLink="/admin/settings" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 cursor-pointer">
                   <span class="material-icons text-sm">settings</span> System Settings
                 </a>
-                <a routerLink="/admin/audit-logs" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-purple-50 text-slate-700 hover:text-[#6D42E8] cursor-pointer">
+                <a routerLink="/admin/audit-logs" (click)="isProfileDropdownOpen.set(false)" class="flex items-center gap-2.5 px-4 py-2 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 cursor-pointer">
                   <span class="material-icons text-sm">security</span> Security & Audit Logs
                 </a>
                 <div class="border-t border-slate-100 my-1"></div>
@@ -213,7 +216,7 @@ interface MenuSection {
           <!-- Sidebar Header / Collapse Toggle -->
           <div class="p-4 border-b border-white/10 flex items-center justify-between relative z-10">
             <div class="flex items-center gap-2.5 overflow-hidden">
-              <div class="w-8 h-8 rounded-lg bg-white/10 text-[#D946EF] flex items-center justify-center shrink-0 border border-white/15">
+              <div class="w-8 h-8 rounded-lg bg-white/10 text-indigo-400 flex items-center justify-center shrink-0 border border-white/15">
                 <span class="material-icons text-base">dashboard_customize</span>
               </div>
               @if (!isSidebarCollapsed()) {
@@ -239,10 +242,10 @@ interface MenuSection {
                 @if (!isSidebarCollapsed()) {
                   <button
                     (click)="toggleSection(group.sectionTitle)"
-                    class="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-purple-300/80 hover:text-white transition-colors cursor-pointer"
+                    class="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400/80 hover:text-white transition-colors cursor-pointer"
                   >
                     <span class="flex items-center gap-1.5">
-                      <span class="material-icons text-xs text-purple-400">{{ group.icon }}</span>
+                      <span class="material-icons text-xs text-indigo-400">{{ group.icon }}</span>
                       <span>{{ group.sectionTitle }}</span>
                     </span>
                     <span class="material-icons text-xs text-slate-400">{{ collapsedSections()[group.sectionTitle] ? 'add' : 'remove' }}</span>
@@ -253,7 +256,7 @@ interface MenuSection {
                   @for (item of group.items; track item.title) {
                     <a
                       [routerLink]="item.route"
-                      routerLinkActive="bg-[#6D42E8] text-white font-bold shadow-md shadow-purple-900/50"
+                      routerLinkActive="bg-indigo-600 text-white font-bold shadow-md shadow-indigo-950/30"
                       [routerLinkActiveOptions]="{ exact: item.route === '/dashboard/overview' }"
                       class="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/10 hover:text-white transition-all cursor-pointer group"
                       [title]="isSidebarCollapsed() ? item.title : ''"
@@ -294,12 +297,12 @@ interface MenuSection {
               <div class="p-3 space-y-3 text-xs">
                 @for (group of menuGroups; track group.sectionTitle) {
                   <div>
-                    <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-300">{{ group.sectionTitle }}</div>
+                    <div class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ group.sectionTitle }}</div>
                     @for (item of group.items; track item.title) {
                       <a
                         [routerLink]="item.route"
                         (click)="isMobileNavOpen.set(false)"
-                        routerLinkActive="bg-[#6D42E8] text-white font-bold"
+                        routerLinkActive="bg-indigo-600 text-white font-bold"
                         [routerLinkActiveOptions]="{ exact: item.route === '/dashboard/overview' }"
                         class="w-full block py-2 px-3 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white flex items-center gap-2.5"
                       >
@@ -325,8 +328,21 @@ interface MenuSection {
     </div>
   `
 })
-export class AdminDashboardLayout {
+export class AdminDashboardLayout implements OnInit {
   private readonly router = inject(Router);
+  private readonly userService = inject(CurrentUserService);
+  private readonly authSession = inject(AuthSessionService);
+  private readonly platformId = inject(PLATFORM_ID);
+  protected readonly adminEmail = this.userService.userEmail;
+
+  ngOnInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      const activeRole = this.userService.syncFromStorage();
+      if (activeRole !== 'admin' && activeRole !== 'superadmin') {
+        this.router.navigateByUrl(this.userService.getHomeRoute(activeRole));
+      }
+    }
+  }
 
   protected readonly isSidebarCollapsed = signal<boolean>(false);
   protected readonly isMobileNavOpen = signal<boolean>(false);
@@ -462,8 +478,9 @@ export class AdminDashboardLayout {
   }
 
   protected logout(): void {
-    localStorage.removeItem('eduerp_role');
-    localStorage.removeItem('eduerp_user');
-    this.router.navigate(['/login']);
+    this.authSession.logoutBackend().subscribe(() => {
+      this.userService.logout();
+      this.router.navigate(['/admin/secure-login']);
+    });
   }
 }

@@ -1,16 +1,18 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global design system tokens & refined SaaS visual utilities */
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --color-midnight: #1A1745;
-  --color-indigo-deep: #0F0D2E;
-  --color-violet-primary: #6D42E8;
-  --color-aurora: #D946EF;
-  --color-erp-bg: #F5F6FF;
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-midnight: #0F172A;
+  --color-indigo-deep: #0B1120;
+  --color-violet-primary: #4F46E5;
+  --color-aurora: #6366F1;
+  --color-erp-bg: #F8FAFC;
   --color-erp-card: #FFFFFF;
-  --color-erp-text: #172554;
+  --color-erp-text: #0F172A;
   --color-erp-muted: #64748B;
 }
 
@@ -20,40 +22,51 @@ body {
   color: var(--color-erp-text);
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom glassmorphism and aurora glow utilities */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Refined executive surface utilities */
 .glass-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(109, 66, 232, 0.15);
+  border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .glass-dark {
-  background: rgba(26, 23, 69, 0.75);
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(217, 70, 239, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .aurora-glow {
-  background: radial-gradient(circle at 50% 50%, rgba(217, 70, 239, 0.18) 0%, rgba(109, 66, 232, 0.08) 50%, transparent 80%);
+  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.14) 0%, rgba(79, 70, 229, 0.05) 55%, transparent 80%);
 }
 
 .gradient-brand {
-  background: linear-gradient(135deg, #1A1745 0%, #0F0D2E 50%, #6D42E8 100%);
+  background: linear-gradient(165deg, #0B1120 0%, #111827 55%, #1E1B4B 100%);
 }
 
 .gradient-accent {
-  background: linear-gradient(135deg, #6D42E8 0%, #D946EF 100%);
+  background: linear-gradient(135deg, #4338CA 0%, #4F46E5 100%);
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #6D42E8 0%, #D946EF 100%);
+  background: linear-gradient(135deg, #3730A3 0%, #4F46E5 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* Custom slim modern scrollbars */
+/* Slim modern scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -62,17 +75,16 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(109, 66, 232, 0.2);
+  background: rgba(100, 116, 139, 0.25);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(109, 66, 232, 0.4);
+  background: rgba(100, 116, 139, 0.45);
 }
 
 aside nav::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.14);
 }
 aside nav::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.3);
 }
-

@@ -32,7 +32,7 @@ export class FinanceService {
         {
           id: 'inst-2',
           label: '2nd Installment',
-          dueDate: '2026-01-15',
+          dueDate: '2026-12-15',
           totalAmount: 60000,
           heads: [
             { id: 'h-4', name: 'Tuition Fee', amount: 40000 },
@@ -44,14 +44,28 @@ export class FinanceService {
     },
     {
       id: 'fs-2',
-      courseId: 'course-btech',
-      courseName: 'Bachelor of Technology',
+      courseId: 'course-btech-cse',
+      courseName: 'B.Tech Computer Science & Engineering',
       academicYear: '2025-26',
       lateFinePerDay: 50,
       totalFee: 150000,
       status: 'Active',
       installments: [
-        { id: 'inst-3', label: 'Annual Fee', dueDate: '2025-09-01', totalAmount: 150000, heads: [{ id: 'h-7', name: 'Academic Fee', amount: 150000 }] }
+        { id: 'inst-3', label: '1st Installment', dueDate: '2025-09-01', totalAmount: 90000, heads: [{ id: 'h-7', name: 'Tuition & Lab Fee', amount: 90000 }] },
+        { id: 'inst-4', label: '2nd Installment', dueDate: '2026-12-20', totalAmount: 60000, heads: [{ id: 'h-8', name: 'Semester II Fee', amount: 60000 }] }
+      ]
+    },
+    {
+      id: 'fs-3',
+      courseId: 'course-bca',
+      courseName: 'Bachelor of Computer Applications',
+      academicYear: '2025-26',
+      lateFinePerDay: 50,
+      totalFee: 80000,
+      status: 'Active',
+      installments: [
+        { id: 'inst-5', label: '1st Installment', dueDate: '2025-08-20', totalAmount: 45000, heads: [{ id: 'h-9', name: 'Tuition Fee', amount: 45000 }] },
+        { id: 'inst-6', label: '2nd Installment', dueDate: '2026-12-18', totalAmount: 35000, heads: [{ id: 'h-10', name: 'Semester II Fee', amount: 35000 }] }
       ]
     }
   ]);
@@ -93,6 +107,84 @@ export class FinanceService {
     });
     
     this._ledgers.set(initialLedgers);
+
+    this.collectPayment({
+      studentId: 'stu-1',
+      studentName: 'Rahul Verma',
+      courseName: 'Master of Computer Applications',
+      date: '2025-08-10',
+      subtotal: 60000,
+      concession: 0,
+      fine: 0,
+      total: 60000,
+      mode: 'UPI',
+      refNo: 'UPI-50284910',
+      items: [{ installmentId: 'inst-1', amount: 60000, fine: 0 }],
+      collectedBy: 'Accounts Office'
+    });
+
+    this.collectPayment({
+      studentId: 'stu-2',
+      studentName: 'Ananya Sharma',
+      courseName: 'Master of Computer Applications',
+      date: '2025-08-12',
+      subtotal: 120000,
+      concession: 0,
+      fine: 0,
+      total: 120000,
+      mode: 'Card',
+      refNo: 'CARD-7741209',
+      items: [
+        { installmentId: 'inst-1', amount: 60000, fine: 0 },
+        { installmentId: 'inst-2', amount: 60000, fine: 0 }
+      ],
+      collectedBy: 'Accounts Office'
+    });
+
+    this.collectPayment({
+      studentId: 'stu-3',
+      studentName: 'Priyanshu Das',
+      courseName: 'Bachelor of Computer Applications',
+      date: '2025-08-18',
+      subtotal: 45000,
+      concession: 0,
+      fine: 0,
+      total: 45000,
+      mode: 'Cash',
+      items: [{ installmentId: 'inst-5', amount: 45000, fine: 0 }],
+      collectedBy: 'Accounts Office'
+    });
+
+    this.collectPayment({
+      studentId: 'stu-4',
+      studentName: 'Meera Patel',
+      courseName: 'B.Tech Computer Science & Engineering',
+      date: '2025-08-29',
+      subtotal: 90000,
+      concession: 0,
+      fine: 0,
+      total: 90000,
+      mode: 'Bank Transfer',
+      refNo: 'NEFT-903412',
+      items: [{ installmentId: 'inst-3', amount: 90000, fine: 0 }],
+      collectedBy: 'Accounts Office'
+    });
+
+    const cancelledCheque = this.collectPayment({
+      studentId: 'stu-1',
+      studentName: 'Rahul Verma',
+      courseName: 'Master of Computer Applications',
+      date: '2025-08-08',
+      subtotal: 60000,
+      concession: 0,
+      fine: 0,
+      total: 60000,
+      mode: 'Cheque',
+      refNo: 'CHQ-114082',
+      items: [{ installmentId: 'inst-2', amount: 60000, fine: 0 }],
+      collectedBy: 'Accounts Office'
+    });
+    this.cancelReceipt(cancelledCheque.id, 'Incorrect installment mapped; re-issued via UPI.');
   }
 
   // --- Fee Structure CRUD ---
@@ -126,7 +218,7 @@ export class FinanceService {
     
     const newPayment: Payment = {
       ...payment,
-      id: `pay-${Date.now()}`,
+      id: `pay-${Date.now()}-${nextNo}`,
       receiptNo,
       status: 'Paid'
     };

@@ -7,6 +7,7 @@ import { DataTable, TableColumn, TableCustomAction } from '../../../components/s
 import { FormDrawer } from '../../../components/shared/form-drawer';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
 import { UserAccountsService } from '../../../services/user-accounts.service';
+import { AuthSessionService } from '../../../services/auth-session.service';
 import { StudentsService } from '../../../services/students.service';
 import { FacultyService } from '../../../services/faculty.service';
 import { ParentsService } from '../../../services/parents.service';
@@ -343,6 +344,7 @@ import { UserAccount, ProfileType } from '../../../models/user-role.model';
 })
 export class UserAccountsPage {
   private readonly userAccountsService = inject(UserAccountsService);
+  private readonly authSession = inject(AuthSessionService);
   private readonly studentsService = inject(StudentsService);
   private readonly facultyService = inject(FacultyService);
   private readonly parentsService = inject(ParentsService);
@@ -579,6 +581,43 @@ export class UserAccountsPage {
     if (val.profileType === 'Student') linkedProfileName = `Student: ${val.name}`;
     else if (val.profileType === 'Faculty') linkedProfileName = `Faculty: ${val.name}`;
     else if (val.profileType === 'Parent') linkedProfileName = `Parent: ${val.name}`;
+
+    if (val.role === 'Admin' || val.role === 'Super Admin') {
+      this.authSession
+        .createAdminAccount({
+          name: val.name,
+          email: val.email,
+          username: val.username,
+          password: val.tempPassword,
+          isSuperAdmin: val.role === 'Super Admin'
+        })
+        .subscribe({
+          next: () => {
+            const res = this.userAccountsService.saveUserAccount({
+              name: val.name,
+              email: val.email,
+              username: val.username,
+              role: val.role,
+              profileType: val.profileType,
+              linkedProfileId: val.linkedProfileId || undefined,
+              linkedProfileName,
+              status: 'Active',
+              forcePasswordChange: val.forcePasswordChange
+            });
+            if (res.success) {
+              this.closeDrawer();
+            } else {
+              this.formErrorMessage.set(res.error || 'Failed to create user account.');
+            }
+          },
+          error: (err: { error?: { message?: string } }) => {
+            this.formErrorMessage.set(
+              err?.error?.message || 'Backend rejected admin creation. Ensure password meets complexity rules.'
+            );
+          }
+        });
+      return;
+    }
 
     const res = this.userAccountsService.saveUserAccount({
       name: val.name,
