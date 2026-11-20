@@ -1,16 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { PageHeader } from '../../../components/shared/page-header';
 import { FormDrawer } from '../../../components/shared/form-drawer';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
 import { CommunicationService } from '../../../services/communication.service';
 import { CurrentUserService } from '../../../services/current-user.service';
-import { AcademicService } from '../../../services/academic.service';
 import { StudentsService } from '../../../services/students.service';
 import { ParentsService } from '../../../services/parents.service';
 import { Message } from '../../../models/communication.model';
+import { FacultyPortalFacade } from '../shared/faculty-portal.facade';
 
 interface RecipientOption {
   id: string;
@@ -21,16 +20,16 @@ interface RecipientOption {
 
 @Component({
   selector: 'app-faculty-message-center',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatIconModule, PageHeader, FormDrawer, ConfirmDialog],
+  imports: [ReactiveFormsModule, MatIconModule, PageHeader, FormDrawer, ConfirmDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6 font-sans text-slate-800 pb-20">
       <app-page-header
         title="Faculty Message Center"
         subtitle="Direct two-way correspondence with academic administrators, section students and parents."
-        primaryActionLabel="Compose Message"
-        (primaryActionClicked)="openCompose()"
+        actionLabel="Compose Message"
+        actionIcon="edit_square"
+        (actionClicked)="openCompose()"
       />
 
       <!-- Main Two-Pane Layout -->
@@ -74,8 +73,10 @@ interface RecipientOption {
               </span>
               <input
                 type="text"
-                [(ngModel)]="searchQuery"
+                [value]="searchQuery()"
+                (input)="onSearchInput($event)"
                 placeholder="Search messages..."
+                aria-label="Search messages"
                 class="w-full h-8 pl-8 pr-3 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#6D42E8]"
               />
             </div>
@@ -156,7 +157,7 @@ interface RecipientOption {
               <div class="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-slate-200/60 pb-2">
                   <span class="font-bold text-slate-800">{{ msg.senderName }}</span>
-                  <span class="text-slate-400 font-mono text-[11px]">{{ msg.timestamp | date:'medium' }}</span>
+                  <span class="text-slate-400 font-mono text-[11px]">{{ formatDateTime(msg.timestamp) }}</span>
                 </div>
                 <div class="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
                   {{ msg.body }}
@@ -168,7 +169,7 @@ interface RecipientOption {
                 <div class="p-4 rounded-2xl bg-purple-50/50 border border-purple-100 space-y-2 ml-0 sm:ml-6">
                   <div class="flex items-center justify-between gap-2 text-xs text-purple-900 font-bold border-b border-purple-100 pb-1.5">
                     <span>{{ reply.senderName }}</span>
-                    <span class="text-[10px] text-purple-400 font-normal shrink-0">{{ reply.timestamp | date:'shortTime' }}</span>
+                    <span class="text-[10px] text-purple-400 font-normal shrink-0">{{ formatTime(reply.timestamp) }}</span>
                   </div>
                   <p class="text-xs text-slate-700 leading-relaxed">{{ reply.body }}</p>
                 </div>
@@ -179,15 +180,17 @@ interface RecipientOption {
             <div class="p-4 border-t border-slate-200 bg-slate-50/60 space-y-3">
               <div class="space-y-2">
                 <textarea
-                  [(ngModel)]="replyText"
+                  [value]="replyText()"
+                  (input)="onReplyInput($event)"
                   rows="2"
                   placeholder="Write a reply..."
                   class="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#6D42E8]"
                 ></textarea>
                 <div class="flex justify-end">
                   <button
+                    type="button"
                     (click)="sendReply()"
-                    [disabled]="!replyText.trim()"
+                    [disabled]="!replyText().trim()"
                     class="w-full sm:w-auto justify-center gradient-accent text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow-md hover:scale-105 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <mat-icon class="text-sm shrink-0">send</mat-icon> Send Reply
@@ -270,7 +273,7 @@ interface RecipientOption {
         title="Delete Message"
         message="Are you sure you want to remove this message from your folder?"
         confirmLabel="Delete Message"
-        (closed)="isConfirmOpen.set(false)"
+        (cancelled)="isConfirmOpen.set(false)"
         (confirmed)="confirmDelete()"
       />
     </div>
@@ -279,12 +282,12 @@ interface RecipientOption {
 export class FacultyMessageCenterPage {
   private readonly commsService = inject(CommunicationService);
   private readonly userService = inject(CurrentUserService);
-  private readonly academicService = inject(AcademicService);
+  private readonly facade = inject(FacultyPortalFacade);
   private readonly studentsService = inject(StudentsService);
   private readonly parentsService = inject(ParentsService);
 
-  protected searchQuery = '';
-  protected replyText = '';
+  protected readonly searchQuery = signal<string>('');
+  protected readonly replyText = signal<string>('');
   protected readonly activeFolder = signal<'Inbox' | 'Sent'>('Inbox');
   protected readonly activeMobileView = signal<'list' | 'thread'>('list');
   protected readonly selectedMessage = signal<Message | null>(null);
@@ -301,9 +304,8 @@ export class FacultyMessageCenterPage {
 
   // Filter recipient options limited to Admin, section students, section parents, section groups
   protected readonly recipientOptions = computed<RecipientOption[]>(() => {
-    const fac = this.currentFaculty();
-    const myAllocs = this.academicService.subjectAllocations().filter(a => a.faculty.toLowerCase().trim() === fac.name.toLowerCase().trim());
-    const myCourses = new Set(myAllocs.map(a => a.course));
+    const myAllocs = this.facade.myAllocations();
+    const myStudents = this.facade.myStudents();
 
     const list: RecipientOption[] = [
       { id: 'admin', name: 'Administrator / Admin Office', roleGroup: 'Admin', subtext: 'Central Administration' }
@@ -320,10 +322,8 @@ export class FacultyMessageCenterPage {
     });
 
     // Add Section Students
-    const allStudents = this.studentsService.students();
-    const secStudents = allStudents.filter(s => myCourses.has(s.course));
-
-    secStudents.forEach(s => {
+    myStudents.forEach(entry => {
+      const s = entry.student;
       list.push({
         id: s.id,
         name: s.name,
@@ -333,7 +333,7 @@ export class FacultyMessageCenterPage {
     });
 
     // Add Section Parents
-    const secStudentIds = new Set(secStudents.map(s => s.id));
+    const secStudentIds = new Set(myStudents.map(e => e.student.id));
     const allParents = this.parentsService.parentsList();
 
     allParents.forEach(p => {
@@ -366,7 +366,7 @@ export class FacultyMessageCenterPage {
 
   protected readonly filteredMessages = computed(() => {
     let list = this.folderMessages();
-    const q = this.searchQuery.trim().toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
 
     if (q) {
       list = list.filter(m =>
@@ -378,6 +378,14 @@ export class FacultyMessageCenterPage {
     }
     return list;
   });
+
+  protected onSearchInput(event: Event): void {
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onReplyInput(event: Event): void {
+    this.replyText.set((event.target as HTMLTextAreaElement).value);
+  }
 
   protected readonly unreadInboxCount = computed(() => {
     const fac = this.currentFaculty();
@@ -430,7 +438,7 @@ export class FacultyMessageCenterPage {
   }
 
   protected sendReply(): void {
-    const text = this.replyText.trim();
+    const text = this.replyText().trim();
     if (!text) return;
 
     const fac = this.currentFaculty();
@@ -439,7 +447,7 @@ export class FacultyMessageCenterPage {
       { id: `rep-${Date.now()}`, senderName: fac.name, body: text, timestamp: new Date() }
     ]);
 
-    this.replyText = '';
+    this.replyText.set('');
     this.studentsService.showToast('success', 'Reply posted.');
   }
 
@@ -460,6 +468,19 @@ export class FacultyMessageCenterPage {
 
   protected formatTime(d: Date | string): string {
     const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return String(d);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  protected formatDateTime(d: Date | string): string {
+    const date = new Date(d);
+    if (Number.isNaN(date.getTime())) return String(d);
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   }
 }

@@ -271,11 +271,35 @@ import { CurrentUserService } from '../../../services/current-user.service';
 
                 <!-- Student Answer -->
                 <div class="space-y-1.5">
-                  <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Student Answer</p>
-                  <div class="p-3.5 rounded-xl bg-slate-50 border border-[#E2E8F0] text-[13px] text-[#172554] leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto">
+                  <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Student Summary Answer</p>
+                  <div class="p-3.5 rounded-xl bg-slate-50 border border-[#E2E8F0] text-[13px] text-[#172554] leading-relaxed whitespace-pre-wrap max-h-44 overflow-y-auto">
                     {{ sub.answerText }}
                   </div>
                 </div>
+
+                <!-- Per-Question Worksheet / Homework Responses -->
+                @if (selectedQuestionAnswers().length > 0) {
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
+                        Question Responses ({{ selectedQuestionAnswers().length }})
+                      </p>
+                    </div>
+                    <div class="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                      @for (qa of selectedQuestionAnswers(); track qa.id) {
+                        <div class="p-3 rounded-xl bg-slate-50 border border-[#E2E8F0] space-y-1.5">
+                          <div class="flex items-center justify-between gap-2">
+                            <span class="text-[11px] font-bold text-[#6D42E8]">Q{{ qa.number }} · {{ qa.topic }}</span>
+                          </div>
+                          <p class="text-xs font-semibold text-[#172554] leading-snug">{{ qa.prompt }}</p>
+                          <div class="p-2.5 rounded-lg bg-white border border-slate-200/80 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                            {{ qa.answer }}
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
 
                 <!-- Attachment Metadata List -->
                 <div class="space-y-2">
@@ -424,6 +448,29 @@ export class FacultyAssignmentSubmissionsPage {
     const stuId = this.selectedStudentId();
     if (!stuId) return null;
     return this.roster().find(r => r.student.id === stuId) ?? null;
+  });
+
+  protected readonly selectedQuestionAnswers = computed(() => {
+    const asg = this.assignment();
+    const row = this.selectedRow();
+    const qaMap = row?.submission?.questionAnswers;
+    if (!asg || !qaMap) return [];
+
+    const questions = asg.questions ?? [];
+    const results: { id: string; number: number; topic: string; prompt: string; answer: string }[] = [];
+    for (const q of questions) {
+      const ans = qaMap[q.id]?.trim();
+      if (ans) {
+        results.push({
+          id: q.id,
+          number: q.number,
+          topic: q.topic,
+          prompt: q.prompt,
+          answer: ans
+        });
+      }
+    }
+    return results;
   });
 
   protected openReviewDrawer(row: AssignmentRosterRow): void {

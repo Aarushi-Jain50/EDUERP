@@ -25,25 +25,34 @@ export class StatusBadge {
       case 'pass':
       case 'submitted':
       case 'online':
+      case 'approved':
+      case 'published':
+      case 'finalized':
         return 'bg-emerald-50/80 text-emerald-700 border-emerald-200/80';
       case 'upcoming':
+      case 'assignment':
         return 'bg-sky-50/80 text-sky-700 border-sky-200/80';
       case 'evaluated':
       case 'hybrid':
-        return 'bg-indigo-50/80 text-indigo-700 border-indigo-200/80';
+      case 'homework':
+      case 'submitted for approval':
+        return 'bg-purple-50/90 text-[#6D42E8] border-purple-200/90';
       case 'offline':
+      case 'offline scanned':
         return 'bg-slate-100/80 text-slate-700 border-slate-300/80';
       case 'completed':
       case 'draft':
         return 'bg-slate-100/80 text-slate-600 border-slate-200';
       case 'inactive':
       case 'pending':
+      case 'pending evaluation':
       case 'partial':
       case 'late':
         return 'bg-amber-50/80 text-amber-700 border-amber-200/80';
       case 'overdue':
       case 'cancelled':
       case 'fail':
+      case 'revision requested':
         return 'bg-rose-50/80 text-rose-700 border-rose-200/80';
       default:
         return 'bg-slate-50 text-slate-600 border-slate-200';
@@ -58,25 +67,34 @@ export class StatusBadge {
       case 'pass':
       case 'submitted':
       case 'online':
+      case 'approved':
+      case 'published':
+      case 'finalized':
         return 'bg-emerald-500';
       case 'upcoming':
+      case 'assignment':
         return 'bg-sky-500';
       case 'evaluated':
       case 'hybrid':
-        return 'bg-indigo-600';
+      case 'homework':
+      case 'submitted for approval':
+        return 'bg-[#6D42E8]';
       case 'offline':
+      case 'offline scanned':
         return 'bg-slate-600';
       case 'completed':
       case 'draft':
         return 'bg-slate-400';
       case 'inactive':
       case 'pending':
+      case 'pending evaluation':
       case 'partial':
       case 'late':
         return 'bg-amber-500';
       case 'overdue':
       case 'cancelled':
       case 'fail':
+      case 'revision requested':
         return 'bg-rose-500';
       default:
         return 'bg-slate-400';

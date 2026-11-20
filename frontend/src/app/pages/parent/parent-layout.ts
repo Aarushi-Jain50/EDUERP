@@ -148,7 +148,7 @@ interface NavCategory {
                 (click)="isNotificationsOpen.set(false)"
                 class="fixed inset-0 z-40 w-full h-full bg-transparent border-0 cursor-default"
               ></button>
-              <div class="absolute right-0 mt-2 w-80 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200/90 p-3.5 z-50">
+              <div class="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-16 sm:top-auto sm:mt-2 sm:w-80 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200/90 p-3.5 z-50">
                 <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
                   <span class="font-bold text-[13px] text-slate-900">Parent Notifications</span>
                   <button
@@ -212,7 +212,7 @@ interface NavCategory {
                 (click)="isProfileDropdownOpen.set(false)"
                 class="fixed inset-0 z-40 w-full h-full bg-transparent border-0 cursor-default"
               ></button>
-              <div class="absolute right-0 mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50">
+              <div class="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-16 sm:top-auto sm:mt-2 sm:w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50">
                 <div class="px-4 py-3 border-b border-slate-100 space-y-0.5">
                   <p class="font-bold text-[13px] text-slate-900 truncate">{{ currentParent().name || 'Parent' }}</p>
                   <p class="text-[11px] text-slate-500 truncate">{{ currentParent().email || userService.userEmail() }}</p>
@@ -227,7 +227,23 @@ interface NavCategory {
                   class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-slate-900 hover:text-indigo-600 text-xs font-medium cursor-pointer"
                 >
                   <mat-icon class="text-base text-indigo-600">person</mat-icon>
-                  <span>Parent Account Profile</span>
+                  <span>My Profile</span>
+                </a>
+                <a
+                  routerLink="/parent/security"
+                  (click)="isProfileDropdownOpen.set(false)"
+                  class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-slate-900 hover:text-indigo-600 text-xs font-medium cursor-pointer"
+                >
+                  <mat-icon class="text-base text-indigo-600">security</mat-icon>
+                  <span>Security & Sessions</span>
+                </a>
+                <a
+                  routerLink="/parent/helpdesk"
+                  (click)="isProfileDropdownOpen.set(false)"
+                  class="flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-slate-900 hover:text-indigo-600 text-xs font-medium cursor-pointer"
+                >
+                  <mat-icon class="text-base text-indigo-600">support_agent</mat-icon>
+                  <span>Helpdesk & Support</span>
                 </a>
                 <div class="border-t border-slate-100 my-1"></div>
                 <button
@@ -247,10 +263,10 @@ interface NavCategory {
       <!-- Desktop Executive Navigation Bar (Horizontal Tabbed Suite) -->
       <nav class="bg-white border-b border-slate-200/90 px-4 sm:px-6 lg:px-8 py-2 hidden lg:flex items-center justify-between gap-4 shrink-0 shadow-xs z-20 overflow-x-auto">
         <div class="flex items-center gap-1 min-w-max">
-          @for (item of allNavItems; track item.route) {
+          @for (item of allNavItems(); track item.route) {
             <a
               [routerLink]="item.route"
-              routerLinkActive="bg-[#0F172A] text-white font-semibold shadow-sm"
+              routerLinkActive="bg-indigo-600 text-white font-semibold shadow-sm"
               [routerLinkActiveOptions]="{ exact: item.route === '/parent/dashboard' }"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer text-xs font-medium"
             >
@@ -314,7 +330,7 @@ interface NavCategory {
             class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs w-full h-full border-0 transition-opacity"
           ></button>
           
-          <div class="relative w-80 max-w-[85vw] bg-white text-slate-900 flex flex-col z-10 overflow-y-auto shadow-2xl h-full">
+          <div class="relative w-80 max-w-[85vw] gradient-brand text-slate-200 flex flex-col z-10 overflow-y-auto shadow-2xl h-full border-r border-white/10">
             
             <!-- Drawer Executive Top Header -->
             <div class="p-4 bg-[#0F172A] text-white flex items-center justify-between border-b border-white/10 shrink-0">
@@ -338,23 +354,23 @@ interface NavCategory {
             </div>
 
             <!-- Sleek Child Selector Card in Mobile Drawer -->
-            <div class="p-3.5 bg-slate-50 border-b border-slate-200/90 shrink-0 space-y-2.5">
+            <div class="p-3.5 bg-white/5 border-b border-white/10 shrink-0 space-y-2.5">
               <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Selected Child</span>
-                <span class="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Child</span>
+                <span class="text-[10px] font-semibold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-400/30">
                   {{ selectedChild()?.enrollmentNo }}
                 </span>
               </div>
 
               <!-- Active Child Profile Card -->
-              <div class="p-3 bg-white rounded-xl border border-slate-200/90 shadow-xs flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl gradient-brand text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0">
+              <div class="p-3 bg-white/10 rounded-xl border border-white/15 shadow-xs flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl gradient-accent text-white flex items-center justify-center text-sm font-bold shadow-xs shrink-0">
                   {{ selectedChild()?.initials || '--' }}
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="text-xs font-bold text-slate-900 truncate">{{ selectedChild()?.name || 'No Student Selected' }}</p>
-                  <p class="text-[11px] text-slate-500 truncate">{{ selectedChild()?.course }} · {{ selectedChild()?.semester }}</p>
-                  <p class="text-[10px] text-slate-400">Section {{ selectedChild()?.section }}</p>
+                  <p class="text-xs font-bold text-white truncate">{{ selectedChild()?.name || 'No Student Selected' }}</p>
+                  <p class="text-[11px] text-slate-300 truncate">{{ selectedChild()?.course }} · {{ selectedChild()?.semester }}</p>
+                  <p class="text-[10px] text-indigo-300">Section {{ selectedChild()?.section }}</p>
                 </div>
               </div>
 
@@ -370,11 +386,11 @@ interface NavCategory {
                         (click)="selectChild(child.id)"
                         class="p-2 rounded-lg text-left transition-all border text-xs cursor-pointer flex items-center gap-2 min-w-0"
                         [class]="isActive
-                          ? 'bg-[#0F172A] text-white border-[#0F172A] font-bold shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'"
+                          ? 'bg-[#6D42E8] text-white border-[#6D42E8] font-bold shadow-xs'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'"
                       >
                         <span class="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0"
-                              [class]="isActive ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'">
+                              [class]="isActive ? 'bg-white text-[#6D42E8]' : 'bg-white/10 text-slate-300'">
                           {{ child.initials }}
                         </span>
                         <span class="truncate text-[11px]">{{ child.name.split(' ')[0] }}</span>
@@ -394,16 +410,16 @@ interface NavCategory {
                     <a
                       [routerLink]="item.route"
                       (click)="isMobileNavOpen.set(false)"
-                      routerLinkActive="bg-[#0F172A] text-white font-semibold shadow-xs"
+                      routerLinkActive="bg-indigo-600 text-white font-semibold shadow-xs"
                       [routerLinkActiveOptions]="{ exact: item.route === '/parent/dashboard' }"
-                      class="w-full py-2.5 px-3 rounded-xl hover:bg-slate-100 text-slate-700 flex items-center justify-between transition-colors group cursor-pointer"
+                      class="w-full py-2.5 px-3 rounded-xl hover:bg-white/10 text-slate-300 flex items-center justify-between transition-colors group cursor-pointer"
                     >
                       <div class="flex items-center gap-2.5 min-w-0">
-                        <mat-icon class="text-base text-slate-500 group-hover:text-slate-900 group-[.font-semibold]:text-indigo-400">{{ item.icon }}</mat-icon>
+                        <mat-icon class="text-base text-slate-400 group-hover:text-white group-[.font-semibold]:text-white">{{ item.icon }}</mat-icon>
                         <span class="text-xs">{{ item.title }}</span>
                       </div>
                       @if (item.badge) {
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold group-[.font-semibold]:bg-indigo-900/60 group-[.font-semibold]:text-indigo-200">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 text-slate-200 font-bold group-[.font-semibold]:bg-white/20 group-[.font-semibold]:text-white">
                           {{ item.badge }}
                         </span>
                       }
@@ -414,21 +430,21 @@ interface NavCategory {
             </nav>
 
             <!-- Drawer Footer Profile -->
-            <div class="p-3 bg-slate-50 border-t border-slate-200/90 flex items-center justify-between shrink-0">
+            <div class="p-3 bg-white/5 border-t border-white/10 flex items-center justify-between shrink-0">
               <div class="flex items-center gap-2 min-w-0">
                 <div class="w-7 h-7 rounded-lg gradient-accent text-white flex items-center justify-center text-xs font-bold shrink-0">
                   {{ currentParent().initials || 'PR' }}
                 </div>
                 <div class="min-w-0">
-                  <p class="text-xs font-bold text-slate-900 truncate">{{ currentParent().name }}</p>
-                  <p class="text-[10px] text-slate-500 truncate">{{ currentParent().email }}</p>
+                  <p class="text-xs font-bold text-white truncate">{{ currentParent().name }}</p>
+                  <p class="text-[10px] text-slate-400 truncate">{{ currentParent().email }}</p>
                 </div>
               </div>
               <button
                 type="button"
                 (click)="logout()"
                 aria-label="Logout"
-                class="text-rose-600 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
+                class="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-white/10 cursor-pointer"
               >
                 <mat-icon class="text-base">logout</mat-icon>
               </button>
@@ -447,7 +463,7 @@ interface NavCategory {
 
       <!-- Toast Feedback -->
       @if (studentsService.toasts().length > 0) {
-        <div class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full pointer-events-none">
+        <div class="fixed bottom-4 left-4 right-4 sm:left-auto z-50 space-y-2 sm:max-w-xs sm:w-full pointer-events-none">
           @for (toast of studentsService.toasts(); track toast.id) {
             <div class="pointer-events-auto bg-white border border-slate-200/90 rounded-2xl shadow-lg p-3.5 flex items-start justify-between gap-2 text-xs text-slate-900">
               <div class="flex items-start gap-2.5">
@@ -533,7 +549,8 @@ export class ParentLayout implements OnInit {
       category: 'Assessment & Grades',
       items: [
         { title: 'Exams', icon: 'event_note', route: '/parent/exams' },
-        { title: 'Results', icon: 'grade', route: '/parent/results' }
+        { title: 'Results', icon: 'grade', route: '/parent/results' },
+        { title: 'Reports', icon: 'analytics', route: '/parent/reports' }
       ]
     },
     {
@@ -541,8 +558,15 @@ export class ParentLayout implements OnInit {
       items: [
         { title: 'Fees & Receipts', icon: 'account_balance_wallet', route: '/parent/fees' },
         { title: 'Notices', icon: 'campaign', route: '/parent/notices' },
-        { title: 'Messages', icon: 'mail', route: '/parent/message-center' },
-        { title: 'My Profile', icon: 'person', route: '/parent/my-profile' }
+        { title: 'Messages', icon: 'mail', route: '/parent/message-center' }
+      ]
+    },
+    {
+      category: 'Support & Account',
+      items: [
+        { title: 'Helpdesk', icon: 'support_agent', route: '/parent/helpdesk' },
+        { title: 'My Profile', icon: 'person', route: '/parent/my-profile' },
+        { title: 'Security & Sessions', icon: 'security', route: '/parent/security' }
       ]
     }
   ];

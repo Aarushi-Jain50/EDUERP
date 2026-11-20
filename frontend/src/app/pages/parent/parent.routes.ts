@@ -36,6 +36,10 @@ export const PARENT_ROUTES: Routes = [
         loadComponent: () => import('./fees/parent-fees').then(m => m.ParentFees)
       },
       {
+        path: 'reports',
+        loadComponent: () => import('./reports/parent-reports').then(m => m.ParentReports)
+      },
+      {
         path: 'notices',
         loadComponent: () => import('./notices/parent-notices').then(m => m.ParentNotices)
       },
@@ -46,6 +50,14 @@ export const PARENT_ROUTES: Routes = [
       {
         path: 'my-profile',
         loadComponent: () => import('./my-profile/parent-my-profile').then(m => m.ParentMyProfile)
+      },
+      {
+        path: 'helpdesk',
+        loadComponent: () => import('./helpdesk/parent-helpdesk').then(m => m.ParentHelpdesk)
+      },
+      {
+        path: 'security',
+        loadComponent: () => import('./security/parent-security').then(m => m.ParentSecurity)
       },
       { path: 'messages', redirectTo: 'message-center', pathMatch: 'full' },
       { path: 'profile', redirectTo: 'my-profile', pathMatch: 'full' }

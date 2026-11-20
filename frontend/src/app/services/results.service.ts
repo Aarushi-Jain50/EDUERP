@@ -1,7 +1,16 @@
-import { Injectable, signal, inject, computed } from '@angular/core';
+import { Injectable, PLATFORM_ID, signal, inject, computed } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { StudentsService } from './students.service';
 import { ExaminationsService } from './examinations.service';
+import { NotificationService } from './notification.service';
 import { getGrade } from '../utils/grade-scale.helper';
+
+export type ResultStatus =
+  | 'Draft'
+  | 'Submitted for Approval'
+  | 'Approved'
+  | 'Published'
+  | 'Revision Requested';
 
 export interface ResultRecord {
   id: string;
@@ -13,15 +22,17 @@ export interface ResultRecord {
   maxMarks: number;
   grade: string;
   remarks: string;
-  status: 'Draft' | 'Published';
+  status: ResultStatus;
+  submittedBy?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  approvalNote?: string;
 }
 
-@Injectable({ providedIn: 'root' })
-export class ResultsService {
-  private readonly studentsService = inject(StudentsService);
-  private readonly examService = inject(ExaminationsService);
+const RESULTS_STORAGE_KEY = 'eduerp_exam_results_v1';
 
-  private _results = signal<ResultRecord[]>([
+const SEED_RESULTS: ResultRecord[] = [
     {
       id: 'res-1',
       examId: 'ex-2', // End-Term Theory Exam
@@ -310,12 +321,24 @@ export class ResultsService {
       remarks: 'Excellent relational schema design',
       status: 'Published'
     }
-  ]);
+];
+
+@Injectable({ providedIn: 'root' })
+export class ResultsService {
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly studentsService = inject(StudentsService);
+  private readonly examService = inject(ExaminationsService);
+  private readonly notificationService = inject(NotificationService);
+
+  private _results = signal<ResultRecord[]>(this.loadStoredResults());
 
   readonly results = this._results.asReadonly();
 
   // Computed stats
   readonly publishedCount = computed(() => this._results().filter(r => r.status === 'Published').length);
+  readonly pendingApprovalCount = computed(
+    () => this._results().filter(r => r.status === 'Submitted for Approval').length
+  );
   readonly toppers = computed(() => {
     // Basic logic to find top performers across published results
     return this._results()
@@ -324,21 +347,58 @@ export class ResultsService {
       .slice(0, 5);
   });
 
+  private loadStoredResults(): ResultRecord[] {
+    if (!isPlatformBrowser(this.platformId)) return SEED_RESULTS;
+    try {
+      const raw = localStorage.getItem(RESULTS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ResultRecord[];
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore corrupted storage
+    }
+    return SEED_RESULTS;
+  }
+
+  private persistResults(list: ResultRecord[]): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      localStorage.setItem(RESULTS_STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      // ignore storage errors
+    }
+  }
+
   getResultsByExam(examId: string) {
     return this._results().filter(r => r.examId === examId);
   }
 
-  saveResults(examId: string, marks: { studentId: string, marks: number, remarks: string }[]): void {
+  getExamApprovalStatus(examId: string): ResultStatus | 'Not Entered' {
+    const list = this.getResultsByExam(examId);
+    if (list.length === 0) return 'Not Entered';
+    if (list.every(r => r.status === 'Published')) return 'Published';
+    if (list.some(r => r.status === 'Submitted for Approval')) return 'Submitted for Approval';
+    if (list.some(r => r.status === 'Revision Requested')) return 'Revision Requested';
+    if (list.some(r => r.status === 'Approved')) return 'Approved';
+    return 'Draft';
+  }
+
+  saveResults(examId: string, marks: { studentId: string; marks: number; remarks: string }[]): void {
     const exam = this.examService.getById(examId);
     if (!exam) return;
+
+    const existing = this.getResultsByExam(examId);
+    const prevByStudent = new Map(existing.map(r => [r.studentId, r]));
 
     const newRecords: ResultRecord[] = marks.map(m => {
       const student = this.studentsService.students().find(s => s.id === m.studentId);
       const percentage = (m.marks / exam.maxMarks) * 100;
       const grade = getGrade(percentage).grade;
+      const prev = prevByStudent.get(m.studentId);
 
       return {
-        id: `res-${Date.now()}-${m.studentId}`,
+        id: prev?.id || `res-${Date.now()}-${m.studentId}`,
         examId,
         studentId: m.studentId,
         studentName: student?.name || 'Unknown',
@@ -347,27 +407,143 @@ export class ResultsService {
         maxMarks: exam.maxMarks,
         grade,
         remarks: m.remarks,
-        status: 'Draft'
+        status: prev?.status === 'Published' ? 'Published' : 'Draft',
+        ...(prev?.submittedBy ? { submittedBy: prev.submittedBy } : {}),
+        ...(prev?.submittedAt ? { submittedAt: prev.submittedAt } : {}),
+        ...(prev?.approvalNote ? { approvalNote: prev.approvalNote } : {})
       };
     });
 
-    // Replace or add new records
     this._results.update(list => {
       const filtered = list.filter(r => r.examId !== examId);
-      return [...filtered, ...newRecords];
+      const next = [...filtered, ...newRecords];
+      this.persistResults(next);
+      return next;
     });
 
-    this.studentsService.showToast('success', `Results for "${exam.title}" saved as draft.`);
+    this.studentsService.showToast('success', `Marks for "${exam.title}" saved as draft.`);
+  }
+
+  submitForApproval(examId: string, submittedBy: string, note = ''): void {
+    const exam = this.examService.getById(examId);
+    if (!exam) return;
+
+    const nowIso = new Date().toISOString();
+    const cleanNote = note.trim();
+
+    this._results.update(list => {
+      const next = list.map(r =>
+        r.examId === examId && r.status !== 'Published'
+          ? {
+              ...r,
+              status: 'Submitted for Approval' as ResultStatus,
+              submittedBy,
+              submittedAt: nowIso,
+              ...(cleanNote ? { approvalNote: cleanNote } : {})
+            }
+          : r
+      );
+      this.persistResults(next);
+      return next;
+    });
+
+    this.notificationService.add({
+      title: `Result approval pending: ${exam.title}`,
+      description: `${submittedBy} submitted ${exam.subjectName} marks for Examination Cell approval.`,
+      type: 'Academic',
+      priority: 'High',
+      icon: 'fact_check',
+      link: '/admin/results',
+      targetRole: 'admin'
+    });
+
+    this.studentsService.showToast(
+      'success',
+      `Results for "${exam.title}" submitted for Examination Cell approval.`
+    );
+  }
+
+  approveAndPublishResults(examId: string, reviewedBy: string, note = ''): void {
+    const exam = this.examService.getById(examId);
+    const nowIso = new Date().toISOString();
+    const cleanNote = note.trim();
+
+    this._results.update(list => {
+      const next = list.map(r =>
+        r.examId === examId
+          ? {
+              ...r,
+              status: 'Published' as ResultStatus,
+              reviewedBy,
+              reviewedAt: nowIso,
+              ...(cleanNote ? { approvalNote: cleanNote } : {})
+            }
+          : r
+      );
+      this.persistResults(next);
+      return next;
+    });
+
+    if (exam) {
+      this.notificationService.add({
+        title: `Results approved & published: ${exam.title}`,
+        description: `${exam.subjectName} results approved by ${reviewedBy} are now live on student & parent portals.`,
+        type: 'Academic',
+        priority: 'Medium',
+        icon: 'verified',
+        link: '/faculty/results-marks',
+        targetRole: 'faculty'
+      });
+    }
+
+    this.studentsService.showToast('success', 'Results approved and published to student portals.');
+  }
+
+  returnResultsForRevision(examId: string, reviewedBy: string, reason: string): void {
+    const exam = this.examService.getById(examId);
+    const nowIso = new Date().toISOString();
+    const cleanReason = reason.trim() || 'Please verify borderline scores and resubmit.';
+
+    this._results.update(list => {
+      const next = list.map(r =>
+        r.examId === examId && r.status !== 'Published'
+          ? {
+              ...r,
+              status: 'Revision Requested' as ResultStatus,
+              reviewedBy,
+              reviewedAt: nowIso,
+              approvalNote: cleanReason
+            }
+          : r
+      );
+      this.persistResults(next);
+      return next;
+    });
+
+    if (exam) {
+      this.notificationService.add({
+        title: `Result revision requested: ${exam.title}`,
+        description: `${reviewedBy}: ${cleanReason}`,
+        type: 'Academic',
+        priority: 'High',
+        icon: 'assignment_return',
+        link: '/faculty/results-marks',
+        targetRole: 'faculty'
+      });
+    }
+
+    this.studentsService.showToast('warning', 'Results returned to faculty for revision.');
   }
 
   publishResults(examId: string): void {
-    this._results.update(list => list.map(r => 
-      r.examId === examId ? { ...r, status: 'Published' } : r
-    ));
-    this.studentsService.showToast('success', 'Results published successfully and visible to students.');
+    this.approveAndPublishResults(examId, 'Controller of Examinations');
   }
 
   deleteResults(examId: string): void {
-    this._results.update(list => list.filter(r => r.examId !== examId));
+    this._results.update(list => {
+      const next = list.filter(r => r.examId !== examId);
+      this.persistResults(next);
+      return next;
+    });
   }
 }

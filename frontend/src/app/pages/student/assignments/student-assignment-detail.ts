@@ -71,6 +71,7 @@ const PAGE_SIZE = 5;
                 <span class="px-2 py-0.5 rounded-lg bg-slate-100 font-mono text-[11px] font-semibold text-[#172554]">
                   {{ item.subjectCode }}
                 </span>
+                <app-status-badge [status]="item.assignment.taskType || 'Assignment'" />
                 <span class="text-xs font-medium text-[#64748B]">{{ item.assignment.subjectName }}</span>
                 <app-status-badge [status]="item.displayStatus" />
                 @if (item.version > 0) {

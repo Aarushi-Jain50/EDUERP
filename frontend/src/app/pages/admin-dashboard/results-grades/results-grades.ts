@@ -10,6 +10,7 @@ import { ResultsService } from '../../../services/results.service';
 import { ExaminationsService } from '../../../services/examinations.service';
 import { AcademicService } from '../../../services/academic.service';
 import { StudentsService } from '../../../services/students.service';
+import { CurrentUserService } from '../../../services/current-user.service';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -20,6 +21,63 @@ import { StudentsService } from '../../../services/students.service';
       <app-page-header title="Results & Grades" subtitle="Finalize and publish examination results and academic performance." primaryActionLabel="Add Marks" (primaryActionClicked)="openMarking()" />
       
       <app-stat-strip [items]="stats()" />
+
+      <!-- Pending Faculty Approval Queue -->
+      @if (pendingApprovals().length > 0) {
+        <div class="bg-purple-50/80 border border-purple-200 rounded-xl p-4 sm:p-5 space-y-3">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-[#6D42E8] text-lg">fact_check</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Pending Faculty Result Approvals ({{ pendingApprovals().length }})</h3>
+                <p class="text-xs text-slate-600">Review marks submitted by faculty members before publishing to student & parent portals.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            @for (batch of pendingApprovals(); track batch.examId) {
+              <div class="bg-white rounded-xl border border-purple-200 p-4 flex flex-col justify-between gap-3">
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-bold text-xs text-slate-900">{{ batch.examTitle }} — {{ batch.subjectName }}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-purple-50 text-[#6D42E8] text-[11px] font-bold">{{ batch.count }} Students</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500">
+                    Submitted by <strong>{{ batch.submittedBy }}</strong> · Avg Score: <strong>{{ batch.avgPct }}%</strong>
+                  </p>
+                  @if (batch.note) {
+                    <p class="text-[11px] text-slate-600 italic">"{{ batch.note }}"</p>
+                  }
+                </div>
+                <div class="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    (click)="selectedExam.set(batch.examId)"
+                    class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Inspect Marks
+                  </button>
+                  <button
+                    type="button"
+                    (click)="openRevisionModal(batch.examId)"
+                    class="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer"
+                  >
+                    Request Revision
+                  </button>
+                  <button
+                    type="button"
+                    (click)="approveBatch(batch.examId)"
+                    class="px-3.5 py-1.5 rounded-lg bg-[#6D42E8] hover:bg-[#5b34cc] text-white text-xs font-bold cursor-pointer"
+                  >
+                    Approve & Publish
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       <app-data-toolbar 
         [filter1Value]="selectedExam()"
@@ -40,18 +98,47 @@ import { StudentsService } from '../../../services/students.service';
           emptyMessage="Select an exam to view results or record new marks."
         />
         
-        @if (selectedExam() !== 'All' && resultsForExam().length > 0 && resultsForExam()[0].status === 'Draft') {
-           <div class="p-4 bg-amber-50 border-t border-amber-100 flex items-center justify-between">
+        @if (selectedExam() !== 'All' && resultsForExam().length > 0 && resultsForExam()[0].status !== 'Published') {
+           <div class="p-4 bg-amber-50 border-t border-amber-100 flex flex-wrap items-center justify-between gap-3">
               <div class="flex items-center gap-2 text-amber-800 text-xs font-medium">
                 <span class="material-icons text-sm">info</span>
-                These results are currently in DRAFT and not visible to students.
+                <span>Current status: <strong>{{ resultsForExam()[0].status }}</strong> — not yet published to students.</span>
               </div>
-              <button (click)="publish()" class="bg-[#6D42E8] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#5b35c9] transition-colors cursor-pointer">
-                Publish Results
-              </button>
+              <div class="flex items-center gap-2">
+                @if (resultsForExam()[0].status === 'Submitted for Approval') {
+                  <button type="button" (click)="openRevisionModal(selectedExam())" class="px-3.5 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-bold hover:bg-rose-50 cursor-pointer">
+                    Request Revision
+                  </button>
+                }
+                <button type="button" (click)="publish()" class="bg-[#6D42E8] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#5b35c9] transition-colors cursor-pointer">
+                  Approve & Publish Results
+                </button>
+              </div>
            </div>
         }
       </div>
+
+      <!-- Revision Reason Modal -->
+      @if (revisionExamId()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <button type="button" aria-label="Close modal" (click)="revisionExamId.set('')" class="fixed inset-0 bg-black/50 w-full h-full border-0"></button>
+          <div class="relative bg-white rounded-2xl shadow-xl p-6 w-full max-w-md z-10 border border-slate-200 space-y-4">
+            <h3 class="text-base font-bold text-slate-900">Return Marks for Revision</h3>
+            <p class="text-xs text-slate-600">Provide remarks explaining which scores need verification before publishing.</p>
+            <textarea
+              rows="3"
+              [value]="revisionReason()"
+              (input)="onRevisionReasonInput($event)"
+              placeholder="e.g. Please double-check Section B practical totals for 2 students."
+              class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:border-[#6D42E8]"
+            ></textarea>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button type="button" (click)="revisionExamId.set('')" class="px-4 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 cursor-pointer">Cancel</button>
+              <button type="button" (click)="confirmRevision()" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold cursor-pointer">Return to Faculty</button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Mark Entry Drawer -->
       <app-form-drawer 
@@ -107,10 +194,13 @@ export class ResultsGradesPage {
   protected readonly examService = inject(ExaminationsService);
   protected readonly academicService = inject(AcademicService);
   protected readonly studentsService = inject(StudentsService);
+  private readonly userService = inject(CurrentUserService);
 
   protected readonly searchQuery = signal('');
   protected readonly selectedExam = signal('All');
   protected readonly isMarkingOpen = signal(false);
+  protected readonly revisionExamId = signal('');
+  protected readonly revisionReason = signal('');
 
   protected readonly markingExamId = signal('');
   protected readonly markingRows = signal<{ studentId: string, name: string, rollNo: string, marks: number, remarks: string }[]>([]);
@@ -122,12 +212,50 @@ export class ResultsGradesPage {
     return exam?.maxMarks || 100;
   });
 
+  protected readonly pendingApprovals = computed(() => {
+    const all = this.resultsService.results().filter(r => r.status === 'Submitted for Approval');
+    const byExam = new Map<string, typeof all>();
+    for (const r of all) {
+      const list = byExam.get(r.examId) || [];
+      list.push(r);
+      byExam.set(r.examId, list);
+    }
+
+    const batches: {
+      examId: string;
+      examTitle: string;
+      subjectName: string;
+      submittedBy: string;
+      note: string;
+      count: number;
+      avgPct: number;
+    }[] = [];
+
+    for (const [examId, list] of byExam.entries()) {
+      const ex = this.examService.getById(examId);
+      const avgPct = Math.round(
+        list.reduce((acc, r) => acc + (r.maxMarks > 0 ? (r.marksObtained / r.maxMarks) * 100 : 0), 0) / list.length
+      );
+      batches.push({
+        examId,
+        examTitle: ex?.title || 'Examination',
+        subjectName: ex?.subjectName || 'Subject',
+        submittedBy: list[0]?.submittedBy || 'Faculty Member',
+        note: list[0]?.approvalNote || '',
+        count: list.length,
+        avgPct
+      });
+    }
+    return batches;
+  });
+
   protected readonly stats = computed<StatItem[]>(() => {
     const published = this.resultsService.publishedCount();
+    const pending = this.pendingApprovals().length;
     const topper = this.resultsService.toppers()[0];
     return [
       { label: 'Published Results', value: published, icon: 'analytics', iconColorClass: 'text-indigo-600', iconBgClass: 'bg-indigo-50 border-indigo-100' },
-      { label: 'Avg Pass Rate', value: '84%', icon: 'grade', iconColorClass: 'text-emerald-600', iconBgClass: 'bg-emerald-50 border-emerald-100' },
+      { label: 'Pending Approvals', value: pending, icon: 'fact_check', iconColorClass: 'text-[#6D42E8]', iconBgClass: 'bg-purple-50 border-purple-100' },
       { label: 'Top Scorer', value: topper ? topper.studentName : 'N/A', icon: 'emoji_events', iconColorClass: 'text-amber-600', iconBgClass: 'bg-amber-50 border-amber-100' }
     ];
   });
@@ -188,9 +316,35 @@ export class ResultsGradesPage {
     this.isMarkingOpen.set(false);
   }
 
+  approveBatch(examId: string) {
+    const reviewer = this.userService.userEmail() || 'Examination Cell';
+    this.resultsService.approveAndPublishResults(examId, reviewer);
+  }
+
+  openRevisionModal(examId: string) {
+    this.revisionReason.set('');
+    this.revisionExamId.set(examId);
+  }
+
+  onRevisionReasonInput(event: Event) {
+    this.revisionReason.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  confirmRevision() {
+    const examId = this.revisionExamId();
+    if (!examId) return;
+    const reviewer = this.userService.userEmail() || 'Examination Cell';
+    this.resultsService.returnResultsForRevision(
+      examId,
+      reviewer,
+      this.revisionReason()
+    );
+    this.revisionExamId.set('');
+  }
+
   publish() {
     if (this.selectedExam() !== 'All') {
-      this.resultsService.publishResults(this.selectedExam());
+      this.approveBatch(this.selectedExam());
     }
   }
 }

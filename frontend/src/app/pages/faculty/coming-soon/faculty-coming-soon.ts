@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-faculty-coming-soon',
-  standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule],
+  imports: [RouterLink, MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col items-center justify-center py-20 px-6 text-center bg-white rounded-3xl border border-slate-200 shadow-sm animate-fade-in">

@@ -210,6 +210,24 @@ type TwoFactorMethod = 'email_otp' | 'totp';
                       }
                     </button>
                   </form>
+
+                  <div class="relative flex items-center py-1">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="shrink mx-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      Or Authorize via Firebase
+                    </span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                  </div>
+
+                  <button
+                    type="button"
+                    [disabled]="isSubmitting()"
+                    (click)="loginWithFirebaseGoogle()"
+                    class="w-full py-3 px-4 rounded-xl border border-slate-200/90 bg-white hover:border-[#6D42E8] hover:bg-purple-50/40 disabled:opacity-70 text-slate-900 text-xs sm:text-[13px] font-semibold transition-colors flex items-center justify-center gap-2.5 cursor-pointer shadow-xs"
+                  >
+                    <mat-icon class="text-base text-[#6D42E8]">verified_user</mat-icon>
+                    <span>Sign in with Authorized Google Account (Firebase Auth)</span>
+                  </button>
                 </div>
 
                 <div class="pt-5 mt-6 border-t border-slate-200/90 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -745,6 +763,42 @@ export class AdminSecureLogin implements OnDestroy {
         this.errorMessage.set(msg || 'Authentication failed. Please verify your administrator credentials.');
       }
     });
+  }
+
+  protected async loginWithFirebaseGoogle(): Promise<void> {
+    this.errorMessage.set('');
+    this.sessionExpiredNotice.set('');
+    this.isSubmitting.set(true);
+
+    try {
+      const keepSession = this.credentialsForm.controls.keepSession.value;
+      const res = await this.authSession.adminFirebaseLogin(keepSession);
+      this.isSubmitting.set(false);
+
+      if (res.success && res.user) {
+        this.userService.loginAs(res.user.isSuperAdmin ? 'superadmin' : 'admin', res.user.email, res.user.name);
+        this.auditService.log({
+          userId: res.user.id,
+          userName: res.user.email,
+          role: 'ADMIN',
+          module: 'Authentication',
+          action: 'Login',
+          target: 'Admin Portal (Firebase Verified)',
+          status: 'Success'
+        });
+        this.router.navigateByUrl(this.resolveAdminReturnUrl());
+      }
+    } catch (err: unknown) {
+      this.isSubmitting.set(false);
+      if (err instanceof HttpErrorResponse) {
+        const msg = (err.error as { message?: string } | null)?.message;
+        this.errorMessage.set(msg || 'Google Admin verification failed.');
+      } else if (err instanceof Error) {
+        this.errorMessage.set(err.message);
+      } else {
+        this.errorMessage.set('Unable to complete Firebase Google Admin Sign-In.');
+      }
+    }
   }
 
   protected submitTwoFactor(): void {

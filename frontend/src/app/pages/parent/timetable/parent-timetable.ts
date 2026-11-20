@@ -24,7 +24,7 @@ type WeekDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
 
         <!-- View Toggle Bar -->
         <div class="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-wrap items-center justify-between gap-3">
-          <div class="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-[#E2E8F0]">
+          <div class="inline-flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-[#E2E8F0] flex-wrap">
             <button
               type="button"
               (click)="viewMode.set('week')"
@@ -40,6 +40,14 @@ type WeekDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
               [class]="viewMode() === 'today' ? 'bg-[#6D42E8] text-white shadow-xs' : 'text-[#64748B] hover:text-[#172554]'"
             >
               Today ({{ todayLabel() }})
+            </button>
+            <button
+              type="button"
+              (click)="viewMode.set('calendar')"
+              class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              [class]="viewMode() === 'calendar' ? 'bg-[#6D42E8] text-white shadow-xs' : 'text-[#64748B] hover:text-[#172554]'"
+            >
+              Academic Calendar
             </button>
           </div>
 
@@ -236,6 +244,54 @@ type WeekDay = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat';
             }
           </div>
         }
+        @if (viewMode() === 'calendar') {
+          <div class="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0]">
+              <div>
+                <h2 class="text-sm font-bold text-[#172554]">Institutional Academic & Holiday Calendar</h2>
+                <p class="text-xs text-[#64748B] mt-0.5">Scheduled holidays, examination dates, and academic events</p>
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                @for (cat of calendarCategories; track cat) {
+                  <button
+                    type="button"
+                    (click)="calendarFilter.set(cat)"
+                    class="px-3 py-1 rounded-lg text-xs font-semibold border transition-colors cursor-pointer"
+                    [class]="calendarFilter() === cat ? 'bg-[#6D42E8] text-white border-[#6D42E8]' : 'bg-slate-50 text-[#64748B] border-[#E2E8F0] hover:text-[#172554]'"
+                  >
+                    {{ cat }}
+                  </button>
+                }
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              @for (ev of filteredCalendarEvents(); track ev.id) {
+                <div class="p-4 rounded-xl border border-[#E2E8F0] bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div class="px-3 py-2 rounded-xl bg-white border border-[#E2E8F0] text-center shrink-0 min-w-[78px]">
+                      <p class="text-xs font-bold text-[#172554]">{{ facade.formatShortDate(ev.date) }}</p>
+                    </div>
+                    <div class="min-w-0">
+                      <h3 class="text-sm font-bold text-[#172554]">{{ ev.title }}</h3>
+                      <p class="text-xs text-[#64748B] mt-0.5">{{ ev.description }}</p>
+                    </div>
+                  </div>
+                  <span
+                    class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap shrink-0 self-start sm:self-center"
+                    [class]="ev.category === 'Holiday'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : ev.category === 'Exam'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-purple-50 text-[#6D42E8] border-purple-200'"
+                  >
+                    {{ ev.category }}
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
       } @else {
         <div class="bg-white rounded-xl border border-[#E2E8F0] shadow-sm">
           <app-empty-state
@@ -253,7 +309,34 @@ export class ParentTimetable {
 
   protected readonly child = this.facade.selectedChild;
   protected readonly sectionSlots = this.facade.selectedTimetableSlots;
-  protected readonly viewMode = signal<'week' | 'today'>('week');
+  protected readonly viewMode = signal<'week' | 'today' | 'calendar'>('week');
+  protected readonly calendarCategories = ['All', 'Holiday', 'Exam', 'Event'] as const;
+  protected readonly calendarFilter = signal<'All' | 'Holiday' | 'Exam' | 'Event'>('All');
+
+  protected readonly calendarEvents = computed(() => {
+    const baseEvents = [
+      { id: 'cal-1', date: '2026-11-24', title: 'Guru Nanak Jayanti', category: 'Holiday' as const, description: 'Institutional public holiday — no regular lectures scheduled.' },
+      { id: 'cal-2', date: '2026-12-05', title: 'Annual Tech & Innovation Symposium', category: 'Event' as const, description: 'Departmental showcase, project expo, and parent-faculty interactive session.' },
+      { id: 'cal-3', date: '2026-12-21', title: 'Semester Winter Break Begins', category: 'Holiday' as const, description: 'Campus winter recess for undergraduate and postgraduate cohorts.' },
+      { id: 'cal-4', date: '2026-12-25', title: 'Christmas Holiday', category: 'Holiday' as const, description: 'Closed campus administrative & academic holiday.' }
+    ];
+
+    const exams = this.facade.selectedExamGroups().upcoming.map(u => ({
+      id: `cal-ex-${u.exam.id}`,
+      date: u.exam.date,
+      title: `${u.exam.title} — ${u.exam.subjectName}`,
+      category: 'Exam' as const,
+      description: `${u.exam.mode} examination · ${u.exam.time} (${u.exam.duration} mins)`
+    }));
+
+    return [...baseEvents, ...exams].sort((a, b) => a.date.localeCompare(b.date));
+  });
+
+  protected readonly filteredCalendarEvents = computed(() => {
+    const filter = this.calendarFilter();
+    const list = this.calendarEvents();
+    return filter === 'All' ? list : list.filter(ev => ev.category === filter);
+  });
 
   protected readonly days: readonly WeekDay[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   protected readonly periods = [

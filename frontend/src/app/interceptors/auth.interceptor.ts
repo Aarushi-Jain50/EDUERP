@@ -7,6 +7,7 @@ import { AuthSessionService } from '../services/auth-session.service';
 
 const PUBLIC_AUTH_PATHS = [
   '/api/v1/auth/admin/login',
+  '/api/v1/auth/admin/firebase-login',
   '/api/v1/auth/admin/verify-2fa',
   '/api/v1/auth/admin/resend-2fa',
   '/api/v1/auth/admin/forgot-password',

@@ -121,16 +121,23 @@ interface ParentSessionItem {
             </button>
           </div>
 
-          <div class="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6">
+          <div class="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-4 sm:p-6">
             @switch (activeTab()) {
 
               <!-- Tab 1: Personal Info (Editable phone and address only) -->
               @case ('personal') {
                 <form [formGroup]="personalForm" (ngSubmit)="savePersonalInfo()" class="space-y-4">
-                  <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                     <h3 class="font-extrabold text-[#172554] text-sm">Guardian Contact Information</h3>
                     <span class="text-[11px] text-[#64748B]">Editable: Phone & Address only</span>
                   </div>
+
+                  @if (personalSuccess()) {
+                    <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-semibold flex items-center gap-2">
+                      <mat-icon class="text-base text-emerald-600 shrink-0">check_circle</mat-icon>
+                      <span>{{ personalSuccess() }}</span>
+                    </div>
+                  }
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1.5">
@@ -198,14 +205,14 @@ interface ParentSessionItem {
                     }
                   </div>
 
-                  <div class="pt-4 border-t border-[#E2E8F0] flex items-center justify-between">
+                  <div class="pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <p class="text-[11px] text-[#64748B]">
                       {{ personalForm.dirty ? 'You have unsaved changes.' : 'Contact information is up to date.' }}
                     </p>
                     <button
                       type="submit"
                       [disabled]="personalForm.invalid || !personalForm.dirty"
-                      class="gradient-accent text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:opacity-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                      class="gradient-accent text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-sm hover:opacity-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer inline-flex items-center justify-center gap-2 self-start sm:self-auto"
                     >
                       <mat-icon class="text-sm">save</mat-icon>
                       <span>Save Changes</span>
@@ -257,15 +264,22 @@ interface ParentSessionItem {
               <!-- Tab 3: Change Password -->
               @case ('password') {
                 <form [formGroup]="passwordForm" (ngSubmit)="changePassword()" class="space-y-4">
-                  <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                     <h3 class="font-extrabold text-[#172554] text-sm">Security Credentials & Password Policy</h3>
                     <span class="text-[11px] text-[#64748B]">Validated against security settings</span>
                   </div>
 
                   @if (passError()) {
                     <div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-                      <mat-icon class="text-base text-rose-600">error_outline</mat-icon>
+                      <mat-icon class="text-base text-rose-600 shrink-0">error_outline</mat-icon>
                       <span>{{ passError() }}</span>
+                    </div>
+                  }
+
+                  @if (passSuccess()) {
+                    <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-semibold flex items-center gap-2">
+                      <mat-icon class="text-base text-emerald-600 shrink-0">check_circle</mat-icon>
+                      <span>{{ passSuccess() }}</span>
                     </div>
                   }
 
@@ -406,7 +420,9 @@ export class ParentMyProfile {
   protected readonly securityPolicy = this.settingsService.security;
 
   protected readonly activeTab = signal<'personal' | 'children' | 'password' | 'sessions'>('personal');
+  protected readonly personalSuccess = signal<string>('');
   protected readonly passError = signal<string>('');
+  protected readonly passSuccess = signal<string>('');
   protected readonly isConfirmOpen = signal<boolean>(false);
   protected readonly sessionToTerminateId = signal<string | null>(null);
 
@@ -450,6 +466,7 @@ export class ParentMyProfile {
   constructor() {
     effect(() => {
       const p = this.currentParent();
+      if (!p) return;
       this.personalForm.reset({
         phone: p.phone || '',
         address: p.address || ''
@@ -469,19 +486,21 @@ export class ParentMyProfile {
   });
 
   protected savePersonalInfo(): void {
+    this.personalSuccess.set('');
     if (this.personalForm.invalid) return;
 
-    const val = this.personalForm.getRawValue();
     const p = this.currentParent();
+    if (!p) return;
 
+    const val = this.personalForm.getRawValue();
     const result = this.parentsService.saveParent(
       {
         name: p.name,
         relation: p.relation,
-        phone: val.phone!.trim(),
+        phone: (val.phone || '').trim(),
         email: p.email,
         occupation: p.occupation,
-        address: val.address!.trim(),
+        address: (val.address || '').trim(),
         studentIds: p.studentIds,
         status: p.status
       },
@@ -499,7 +518,9 @@ export class ParentMyProfile {
         status: 'Success'
       });
       this.personalForm.markAsPristine();
+      this.personalSuccess.set('Guardian contact details updated successfully.');
       this.studentsService.showToast('success', 'Guardian contact details updated successfully.');
+      setTimeout(() => this.personalSuccess.set(''), 4000);
     } else {
       this.studentsService.showToast('error', result.error || 'Failed to update guardian profile.');
     }
@@ -507,6 +528,7 @@ export class ParentMyProfile {
 
   protected changePassword(): void {
     this.passError.set('');
+    this.passSuccess.set('');
     const val = this.passwordForm.getRawValue();
 
     if (!val.currentPassword) {
@@ -528,6 +550,8 @@ export class ParentMyProfile {
     }
 
     const p = this.currentParent();
+    if (!p) return;
+
     this.auditService.log({
       userId: p.id,
       userName: p.name,
@@ -539,7 +563,9 @@ export class ParentMyProfile {
     });
 
     this.passwordForm.reset({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    this.passSuccess.set('Password updated successfully.');
     this.studentsService.showToast('success', 'Password updated successfully.');
+    setTimeout(() => this.passSuccess.set(''), 4000);
   }
 
   protected openTerminateConfirm(id: string): void {
@@ -553,15 +579,17 @@ export class ParentMyProfile {
       const p = this.currentParent();
       this.activeSessions.update(list => list.filter(s => s.id !== id));
       this.isConfirmOpen.set(false);
-      this.auditService.log({
-        userId: p.id,
-        userName: p.name,
-        role: 'Parent',
-        module: 'Parent Security',
-        action: 'Delete',
-        target: `Session ${id}`,
-        status: 'Success'
-      });
+      if (p) {
+        this.auditService.log({
+          userId: p.id,
+          userName: p.name,
+          role: 'Parent',
+          module: 'Parent Security',
+          action: 'Delete',
+          target: `Session ${id}`,
+          status: 'Success'
+        });
+      }
       this.studentsService.showToast('info', 'Device session terminated.');
     }
   }

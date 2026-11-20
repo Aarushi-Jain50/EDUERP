@@ -4,11 +4,12 @@ import {
   RbacRole,
   ensureAuthReady,
   findAuthUserById,
+  isAuthorizedAdminEmail,
   isSessionActive,
+  upsertRuntimePortalUser,
   verifyJwt
 } from '../db/auth-store';
 import { adminAuth } from '../../../src/lib/firebase-admin.ts';
-import { getOrCreateUser } from '../../../src/db/users.ts';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -54,14 +55,6 @@ export function extractRequestToken(req: Request): string | null {
   return null;
 }
 
-function toRbacRole(rawRole: string | undefined): RbacRole {
-  const upper = (rawRole ?? '').toUpperCase();
-  if (upper === RbacRole.ADMIN) return RbacRole.ADMIN;
-  if (upper === RbacRole.FACULTY) return RbacRole.FACULTY;
-  if (upper === RbacRole.PARENT) return RbacRole.PARENT;
-  return RbacRole.STUDENT;
-}
-
 export const authenticateToken = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -78,17 +71,7 @@ export const authenticateToken = async (
     return;
   }
 
-  try {
-    await ensureAuthReady();
-  } catch (err) {
-    console.error('Failed to initialize Cloud SQL auth store:', err);
-    res.status(503).json({
-      success: false,
-      code: 'DB_UNAVAILABLE',
-      message: 'Database service temporarily unavailable.'
-    });
-    return;
-  }
+  await ensureAuthReady();
 
   // 1. Check signed internal Admin/Session JWT first
   const verified = verifyJwt(token);
@@ -118,6 +101,7 @@ export const authenticateToken = async (
 
     req.user = {
       id: user.id,
+      uid: user.uid,
       email: user.email,
       username: user.username,
       name: user.name,
@@ -129,22 +113,29 @@ export const authenticateToken = async (
     return;
   }
 
-  // 2. Fall back to Firebase Auth ID Token verification + Cloud SQL PostgreSQL user sync
+  // 2. Fall back to Firebase Auth ID Token verification
   try {
     const decodedToken = await adminAuth.verifyIdToken(token);
     const email = (decodedToken.email ?? '').trim().toLowerCase();
     const displayName = typeof decodedToken['name'] === 'string' ? decodedToken['name'] : '';
-    const syncedUser = await getOrCreateUser(decodedToken.uid, email || `${decodedToken.uid}@eduerp.local`, displayName);
+    const isAdmin = Boolean(decodedToken.email_verified && isAuthorizedAdminEmail(email));
+
+    const syncedUser = await upsertRuntimePortalUser({
+      uid: decodedToken.uid,
+      email: email || `${decodedToken.uid}@eduerp.local`,
+      name: displayName,
+      role: isAdmin ? RbacRole.ADMIN : RbacRole.STUDENT
+    });
 
     req.firebaseUser = decodedToken;
     req.user = {
-      id: `fb-${decodedToken.uid}`,
+      id: syncedUser.id,
       uid: decodedToken.uid,
       email: syncedUser.email,
-      username: email ? email.split('@')[0] : decodedToken.uid,
-      name: syncedUser.name || displayName || email || 'EduERP User',
-      role: toRbacRole(syncedUser.role),
-      isSuperAdmin: false,
+      username: syncedUser.username,
+      name: syncedUser.name,
+      role: syncedUser.role,
+      isSuperAdmin: syncedUser.isSuperAdmin,
       jti: decodedToken.uid
     };
     next();

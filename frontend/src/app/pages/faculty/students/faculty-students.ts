@@ -1,24 +1,23 @@
 import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { PageHeader } from '../../../components/shared/page-header';
 import { StatStrip, StatItem } from '../../../components/shared/stat-strip';
-import { CurrentUserService } from '../../../services/current-user.service';
-import { AcademicService } from '../../../services/academic.service';
-import { StudentsService } from '../../../services/students.service';
-import { Student } from '../../../models/student.model';
+import { exportToPdf } from '../../../utils/export.helper';
+import { FacultyPortalFacade, FacultyStudentSummary } from '../shared/faculty-portal.facade';
 
 @Component({
   selector: 'app-faculty-students',
-  standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, PageHeader, StatStrip],
+  imports: [RouterLink, MatIconModule, PageHeader, StatStrip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6 font-sans text-slate-800 pb-24">
-      <app-page-header 
-        title="My Allocated Students Roster" 
-        subtitle="Review student engagement, attendance records, academic performance and risk status." 
+      <app-page-header
+        title="My Allocated Students Roster"
+        subtitle="Review real-time attendance, exam performance, guardian contacts, and at-risk standing."
+        [actionLabel]="filteredStudents().length > 0 ? 'Export Roster PDF' : ''"
+        actionIcon="picture_as_pdf"
+        (actionClicked)="exportStudentsPdf()"
       />
 
       <div class="mb-6 sm:mb-8">
@@ -32,22 +31,26 @@ import { Student } from '../../../models/student.model';
             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <mat-icon class="text-sm">search</mat-icon>
             </span>
-            <input 
-              type="text" 
-              [(ngModel)]="searchQuery"
+            <input
+              type="text"
+              [value]="searchQuery()"
+              (input)="onSearchInput($event)"
               placeholder="Search by student name or enrollment no..."
+              aria-label="Search students"
               class="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#6D42E8]"
             />
           </div>
         </div>
 
         <div class="flex items-center gap-3 w-full sm:w-auto">
-          <select 
-            [(ngModel)]="selectedRisk"
+          <select
+            [value]="selectedRisk()"
+            (change)="onRiskChange($event)"
+            aria-label="Filter by risk status"
             class="w-full sm:w-auto h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:border-[#6D42E8]"
           >
             <option value="">All Risk Categories</option>
-            <option value="At Risk">At Risk (<75% Att / <40% Marks)</option>
+            <option value="At Risk">At Risk (&lt; {{ facade.attendanceThreshold() }}% Att / &lt; 40% Marks)</option>
             <option value="Normal">Normal Standing</option>
           </select>
         </div>
@@ -57,14 +60,10 @@ import { Student } from '../../../models/student.model';
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <!-- Phone Card List (< sm) -->
         <div class="sm:hidden divide-y divide-slate-100">
-          @for (stu of filteredStudents(); track stu.id; let idx = $index) {
-            @let att = 74 + (idx * 5) % 25;
-            @let marks = 62 + (idx * 4) % 35;
-            @let isAtRisk = att < 75 || marks < 40;
-
+          @for (item of filteredStudents(); track item.student.id) {
             <div
-              (click)="openStudentDetail(stu)"
-              (keydown.enter)="openStudentDetail(stu)"
+              (click)="openStudentDetail(item)"
+              (keydown.enter)="openStudentDetail(item)"
               tabindex="0"
               role="button"
               class="p-4 space-y-2.5 hover:bg-slate-50/70 transition-colors cursor-pointer"
@@ -72,25 +71,33 @@ import { Student } from '../../../models/student.model';
               <div class="flex items-start justify-between gap-2">
                 <div class="flex items-center gap-2.5 min-w-0">
                   <div class="w-8 h-8 rounded-full bg-purple-100 text-[#6D42E8] font-black text-xs flex items-center justify-center shrink-0">
-                    {{ stu.initials || 'ST' }}
+                    {{ item.student.initials || 'ST' }}
                   </div>
                   <div class="min-w-0">
-                    <p class="font-bold text-slate-900 text-xs truncate">{{ stu.name }}</p>
-                    <p class="text-[11px] font-mono text-slate-500 truncate">{{ stu.enrollmentNo }}</p>
+                    <p class="font-bold text-slate-900 text-xs truncate">{{ item.student.name }}</p>
+                    <p class="text-[11px] font-mono text-slate-500 truncate">{{ item.student.enrollmentNo }}</p>
                   </div>
                 </div>
-                <span [class]="isAtRisk ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'" class="px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase whitespace-nowrap shrink-0">
-                  {{ isAtRisk ? 'At Risk' : 'Normal' }}
+                <span
+                  [class]="item.isAtRisk ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'"
+                  class="px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase whitespace-nowrap shrink-0"
+                >
+                  {{ item.isAtRisk ? 'At Risk' : 'Normal' }}
                 </span>
               </div>
 
               <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
-                <span class="min-w-0 truncate">{{ stu.course }} · Sem {{ stu.semester }}</span>
+                <span class="min-w-0 truncate">{{ item.student.course }} · {{ item.student.semester }}</span>
                 <div class="flex items-center gap-2 shrink-0">
-                  <span [class]="att < 75 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2 py-0.5 rounded-full font-black text-[10px] whitespace-nowrap">
-                    {{ att }}% Att.
+                  <span
+                    [class]="item.isLowAttendance ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'"
+                    class="px-2 py-0.5 rounded-full font-black text-[10px] whitespace-nowrap"
+                  >
+                    {{ item.attendancePct }}% Att.
                   </span>
-                  <span class="font-bold text-slate-900 tabular-nums whitespace-nowrap">{{ marks }}% Avg</span>
+                  <span class="font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                    {{ item.avgMarksPct !== null ? item.avgMarksPct + '% Avg' : 'No Marks' }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -115,37 +122,39 @@ import { Student } from '../../../models/student.model';
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-50">
-              @for (stu of filteredStudents(); track stu.id; let idx = $index) {
-                @let att = 74 + (idx * 5) % 25;
-                @let marks = 62 + (idx * 4) % 35;
-                @let isAtRisk = att < 75 || marks < 40;
-
-                <tr (click)="openStudentDetail(stu)" class="hover:bg-slate-50/50 transition-colors cursor-pointer">
+              @for (item of filteredStudents(); track item.student.id) {
+                <tr (click)="openStudentDetail(item)" class="hover:bg-slate-50/50 transition-colors cursor-pointer">
                   <td class="px-6 py-4 font-bold text-slate-900 flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-purple-100 text-[#6D42E8] font-black text-xs flex items-center justify-center shrink-0">
-                      {{ stu.initials || 'ST' }}
+                      {{ item.student.initials || 'ST' }}
                     </div>
                     <div>
-                      <p class="font-bold text-slate-900">{{ stu.name }}</p>
-                      <p class="text-[10px] text-slate-500 font-normal">{{ stu.email }}</p>
+                      <p class="font-bold text-slate-900">{{ item.student.name }}</p>
+                      <p class="text-[10px] text-slate-500 font-normal">{{ item.student.email }}</p>
                     </div>
                   </td>
-                  <td class="px-6 py-4 font-mono text-slate-600">{{ stu.enrollmentNo }}</td>
+                  <td class="px-6 py-4 font-mono text-slate-600">{{ item.student.enrollmentNo }}</td>
                   <td class="px-6 py-4 text-slate-600">
-                    <span class="font-bold block">{{ stu.course }}</span>
-                    <span class="text-[10px] text-slate-400">Semester {{ stu.semester }}</span>
+                    <span class="font-bold block">{{ item.student.course }}</span>
+                    <span class="text-[10px] text-slate-400">{{ item.student.semester }} · {{ item.student.section }}</span>
                   </td>
                   <td class="px-6 py-4 text-center">
-                    <span [class]="att < 75 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'" class="px-2.5 py-1 rounded-full font-black text-[10px]">
-                      {{ att }}%
+                    <span
+                      [class]="item.isLowAttendance ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'"
+                      class="px-2.5 py-1 rounded-full font-black text-[10px] tabular-nums"
+                    >
+                      {{ item.attendancePct }}%
                     </span>
                   </td>
                   <td class="px-6 py-4 text-center font-bold text-slate-900 tabular-nums">
-                    {{ marks }}%
+                    {{ item.avgMarksPct !== null ? item.avgMarksPct + '%' : 'Pending' }}
                   </td>
                   <td class="px-6 py-4 text-right">
-                    <span [class]="isAtRisk ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'" class="px-2.5 py-1 rounded-full font-black text-[10px] uppercase">
-                      {{ isAtRisk ? 'At Risk' : 'Normal' }}
+                    <span
+                      [class]="item.isAtRisk ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'"
+                      class="px-2.5 py-1 rounded-full font-black text-[10px] uppercase"
+                    >
+                      {{ item.isAtRisk ? 'At Risk' : 'Normal' }}
                     </span>
                   </td>
                 </tr>
@@ -162,21 +171,31 @@ import { Student } from '../../../models/student.model';
       </div>
 
       <!-- Student Read-Only Summary Drawer -->
-      @if (isDetailOpen() && activeStudent()) {
+      @if (activeStudent(); as summary) {
         <div class="fixed inset-0 z-50 flex justify-end">
-          <button type="button" aria-label="Close student detail drawer" (click)="isDetailOpen.set(false)" class="fixed inset-0 bg-black/50 w-full h-full border-0"></button>
+          <button
+            type="button"
+            aria-label="Close student detail drawer"
+            (click)="activeStudent.set(null)"
+            class="fixed inset-0 bg-black/50 w-full h-full border-0"
+          ></button>
           <div class="relative w-full max-w-lg bg-white h-full shadow-2xl z-10 flex flex-col p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6">
             <div class="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-purple-100 text-[#6D42E8] font-black text-base flex items-center justify-center shrink-0">
-                  {{ activeStudent()?.initials }}
+                  {{ summary.student.initials }}
                 </div>
                 <div class="min-w-0">
-                  <h3 class="font-extrabold text-slate-900 text-base truncate">{{ activeStudent()?.name }}</h3>
-                  <p class="text-xs text-slate-500 font-mono truncate">{{ activeStudent()?.enrollmentNo }}</p>
+                  <h3 class="font-extrabold text-slate-900 text-base truncate">{{ summary.student.name }}</h3>
+                  <p class="text-xs text-slate-500 font-mono truncate">{{ summary.student.enrollmentNo }}</p>
                 </div>
               </div>
-              <button (click)="isDetailOpen.set(false)" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer shrink-0">
+              <button
+                type="button"
+                (click)="activeStudent.set(null)"
+                aria-label="Close drawer"
+                class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
+              >
                 <mat-icon>close</mat-icon>
               </button>
             </div>
@@ -185,35 +204,50 @@ import { Student } from '../../../models/student.model';
               <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <p class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Academic Details</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600">
-                  <div class="min-w-0">Course: <strong class="text-slate-900">{{ activeStudent()?.course }}</strong></div>
-                  <div>Semester: <strong class="text-slate-900">Semester {{ activeStudent()?.semester }}</strong></div>
-                  <div class="min-w-0 break-all">Email: <strong class="text-slate-900">{{ activeStudent()?.email }}</strong></div>
-                  <div>Phone: <strong class="text-slate-900">{{ activeStudent()?.phone }}</strong></div>
+                  <div class="min-w-0">Course: <strong class="text-slate-900">{{ summary.student.course }}</strong></div>
+                  <div>Term: <strong class="text-slate-900">{{ summary.student.semester }} · {{ summary.student.section }}</strong></div>
+                  <div class="min-w-0 break-all">Email: <strong class="text-slate-900">{{ summary.student.email }}</strong></div>
+                  <div>Phone: <strong class="text-slate-900">{{ summary.student.phone }}</strong></div>
+                  <div>Attendance: <strong [class]="summary.isLowAttendance ? 'text-rose-600' : 'text-emerald-700'">{{ summary.attendancePct }}% ({{ summary.attendedSessions }}/{{ summary.totalSessions }})</strong></div>
+                  <div>Avg Marks: <strong class="text-slate-900">{{ summary.avgMarksPct !== null ? summary.avgMarksPct + '%' : 'Pending' }}</strong></div>
                 </div>
               </div>
 
               <div class="p-4 rounded-xl bg-purple-50/50 border border-purple-100 space-y-2">
-                <p class="font-bold text-[#6D42E8] uppercase tracking-wider text-[10px]">Guardian Information</p>
-                <p class="text-slate-700 font-medium">Guardian Name: <strong class="text-slate-900">Mr. & Mrs. Sharma</strong></p>
-                <p class="text-slate-700 font-medium">Emergency Contact: <strong class="text-slate-900">+91 9811223344</strong></p>
+                <div class="flex items-center justify-between gap-2">
+                  <p class="font-bold text-[#6D42E8] uppercase tracking-wider text-[10px]">Guardian Information</p>
+                  <a
+                    routerLink="/faculty/message-center"
+                    (click)="activeStudent.set(null)"
+                    class="text-[11px] font-semibold text-[#6D42E8] hover:underline"
+                  >
+                    Message Parent →
+                  </a>
+                </div>
+                <p class="text-slate-700 font-medium">
+                  Guardian Name: <strong class="text-slate-900">{{ summary.guardianName }}</strong> ({{ summary.guardianRelation }})
+                </p>
+                <p class="text-slate-700 font-medium">
+                  Emergency Contact: <strong class="text-slate-900">{{ summary.guardianPhone }}</strong>
+                </p>
               </div>
 
               <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <p class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Subject-wise Performance Breakdown</p>
-                <div class="space-y-2 pt-1">
-                  <div class="flex justify-between items-center gap-2">
-                    <span class="text-slate-600 min-w-0">Advanced Data Structures</span>
-                    <span class="font-bold text-emerald-600 whitespace-nowrap shrink-0">88% (Grade A+)</span>
+                <p class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Published Examination Results</p>
+                @if (summary.subjectResults.length > 0) {
+                  <div class="space-y-2 pt-1">
+                    @for (res of summary.subjectResults; track res.examTitle + res.subjectName) {
+                      <div class="flex justify-between items-center gap-2">
+                        <span class="text-slate-600 min-w-0 truncate">{{ res.subjectName }} ({{ res.examTitle }})</span>
+                        <span class="font-bold text-slate-900 whitespace-nowrap shrink-0 tabular-nums">
+                          {{ res.marksObtained }}/{{ res.maxMarks }} · {{ res.percentage }}% ({{ res.grade }})
+                        </span>
+                      </div>
+                    }
                   </div>
-                  <div class="flex justify-between items-center gap-2">
-                    <span class="text-slate-600 min-w-0">Enterprise Web Architecture</span>
-                    <span class="font-bold text-emerald-600 whitespace-nowrap shrink-0">82% (Grade A)</span>
-                  </div>
-                  <div class="flex justify-between items-center gap-2">
-                    <span class="text-slate-600 min-w-0">Cloud Computing & DevOps</span>
-                    <span class="font-bold text-slate-800 whitespace-nowrap shrink-0">76% (Grade B+)</span>
-                  </div>
-                </div>
+                } @else {
+                  <p class="text-slate-400 italic py-2">No examination scores published yet.</p>
+                }
               </div>
             </div>
           </div>
@@ -223,53 +257,75 @@ import { Student } from '../../../models/student.model';
   `
 })
 export class FacultyStudentsPage {
-  protected readonly userService = inject(CurrentUserService);
-  protected readonly academicService = inject(AcademicService);
-  protected readonly studentsService = inject(StudentsService);
+  protected readonly facade = inject(FacultyPortalFacade);
 
-  protected searchQuery = '';
-  protected selectedRisk = '';
+  protected readonly searchQuery = signal<string>('');
+  protected readonly selectedRisk = signal<string>('');
+  protected readonly activeStudent = signal<FacultyStudentSummary | null>(null);
 
-  protected readonly isDetailOpen = signal<boolean>(false);
-  protected readonly activeStudent = signal<Student | null>(null);
+  protected onSearchInput(event: Event): void {
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
 
-  protected readonly currentFaculty = this.userService.currentFaculty;
-
-  protected readonly myAllocations = computed(() => {
-    const fac = this.currentFaculty();
-    return this.academicService.subjectAllocations().filter(a => a.faculty.toLowerCase().trim() === fac.name.toLowerCase().trim());
-  });
-
-  protected readonly facultyStudents = computed(() => {
-    const allocs = this.myAllocations();
-    const courses = new Set(allocs.map(a => a.course));
-    const allStudents = this.studentsService.students();
-    return allStudents.filter(s => courses.has(s.course));
-  });
+  protected onRiskChange(event: Event): void {
+    this.selectedRisk.set((event.target as HTMLSelectElement).value);
+  }
 
   protected readonly filteredStudents = computed(() => {
-    let list = this.facultyStudents();
-    const q = this.searchQuery.trim().toLowerCase();
+    let list = this.facade.myStudents();
+    const q = this.searchQuery().trim().toLowerCase();
     if (q) {
-      list = list.filter(s => s.name.toLowerCase().includes(q) || s.enrollmentNo.toLowerCase().includes(q));
+      list = list.filter(
+        item =>
+          item.student.name.toLowerCase().includes(q) ||
+          item.student.enrollmentNo.toLowerCase().includes(q) ||
+          item.student.course.toLowerCase().includes(q)
+      );
     }
-    if (this.selectedRisk === 'At Risk') {
-      list = list.filter((_, idx) => (74 + (idx * 5) % 25) < 75 || (62 + (idx * 4) % 35) < 40);
+    if (this.selectedRisk() === 'At Risk') {
+      list = list.filter(item => item.isAtRisk);
+    } else if (this.selectedRisk() === 'Normal') {
+      list = list.filter(item => !item.isAtRisk);
     }
     return list;
   });
 
-  protected openStudentDetail(stu: Student): void {
-    this.activeStudent.set(stu);
-    this.isDetailOpen.set(true);
+  protected openStudentDetail(item: FacultyStudentSummary): void {
+    this.activeStudent.set(item);
+  }
+
+  protected exportStudentsPdf(): void {
+    const fac = this.facade.currentFaculty();
+    const cols = ['Enrollment No', 'Student Name', 'Program & Section', 'Attendance %', 'Avg Marks', 'Standing'];
+    const rows = this.filteredStudents().map(item => [
+      item.student.enrollmentNo,
+      item.student.name,
+      `${item.student.course} (${item.student.section})`,
+      `${item.attendancePct}%`,
+      item.avgMarksPct !== null ? `${item.avgMarksPct}%` : '-',
+      item.isAtRisk ? 'At Risk' : 'Normal'
+    ]);
+
+    exportToPdf(
+      'Faculty Allocated Students Roster',
+      cols,
+      rows,
+      `${fac.employeeId.toLowerCase()}-students-roster`,
+      [
+        `Faculty: ${fac.name} (${fac.employeeId}) | Department: ${fac.department}`,
+        `Total Students: ${rows.length} | Threshold: ${this.facade.attendanceThreshold()}%`
+      ]
+    );
   }
 
   protected readonly stats = computed<StatItem[]>(() => {
-    const list = this.facultyStudents();
+    const list = this.facade.myStudents();
+    const lowAtt = list.filter(s => s.isLowAttendance).length;
+    const atRisk = list.filter(s => s.isAtRisk).length;
     return [
-      { label: 'Enrolled Students', value: list.length, icon: 'groups', iconColorClass: 'text-indigo-600', iconBgClass: 'bg-indigo-50 border-indigo-100' },
-      { label: 'Low Attendance', value: 4, icon: 'warning', iconColorClass: 'text-amber-600', iconBgClass: 'bg-amber-50 border-amber-100' },
-      { label: 'At-Risk Students', value: 2, icon: 'error', iconColorClass: 'text-rose-600', iconBgClass: 'bg-rose-50 border-rose-100' }
+      { label: 'Enrolled Students', value: list.length, icon: 'groups', iconColorClass: 'text-[#6D42E8]', iconBgClass: 'bg-purple-50 border-purple-100' },
+      { label: 'Low Attendance', value: lowAtt, icon: 'warning', iconColorClass: 'text-amber-600', iconBgClass: 'bg-amber-50 border-amber-100' },
+      { label: 'At-Risk Students', value: atRisk, icon: 'error', iconColorClass: 'text-rose-600', iconBgClass: 'bg-rose-50 border-rose-100' }
     ];
   });
 }

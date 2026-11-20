@@ -1,18 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { PageHeader } from '../../../components/shared/page-header';
 import { StatStrip, StatItem } from '../../../components/shared/stat-strip';
-import { CommunicationService } from '../../../services/communication.service';
-import { AcademicService } from '../../../services/academic.service';
-import { CurrentUserService } from '../../../services/current-user.service';
 import { Notice, NoticePriority } from '../../../models/communication.model';
+import { FacultyPortalFacade } from '../shared/faculty-portal.facade';
 
 @Component({
   selector: 'app-faculty-notices',
-  standalone: true,
-  imports: [CommonModule, FormsModule, MatIconModule, PageHeader, StatStrip],
+  imports: [MatIconModule, PageHeader, StatStrip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6 font-sans text-slate-800 pb-20">
@@ -64,8 +59,10 @@ import { Notice, NoticePriority } from '../../../models/communication.model';
           </span>
           <input
             type="text"
-            [(ngModel)]="searchQuery"
+            [value]="searchQuery()"
+            (input)="onSearchInput($event)"
             placeholder="Search notice title or content..."
+            aria-label="Search notice title or content"
             class="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#6D42E8]"
           />
         </div>
@@ -174,45 +171,21 @@ import { Notice, NoticePriority } from '../../../models/communication.model';
   `
 })
 export class FacultyNoticesPage {
-  private readonly commsService = inject(CommunicationService);
-  private readonly academicService = inject(AcademicService);
-  private readonly userService = inject(CurrentUserService);
+  private readonly facade = inject(FacultyPortalFacade);
 
-  protected searchQuery = '';
+  protected readonly searchQuery = signal<string>('');
   protected readonly activeTab = signal<'all' | 'important' | 'urgent' | 'pinned'>('all');
   protected readonly selectedNotice = signal<Notice | null>(null);
 
   // Per-user read notice tracking
   protected readonly readNoticeIds = signal<Set<string>>(new Set(['n-1']));
 
-  protected readonly currentFaculty = this.userService.currentFaculty;
-
-  // Faculty's allocated courses for filtering
-  protected readonly myAllocatedCourses = computed(() => {
-    const fac = this.currentFaculty();
-    const allocs = this.academicService.subjectAllocations().filter(a => a.faculty.toLowerCase().trim() === fac.name.toLowerCase().trim());
-    return new Set(allocs.map(a => a.course));
-  });
-
-  // Eligible notices for this faculty
-  protected readonly eligibleNotices = computed(() => {
-    const allNotices = this.commsService.notices();
-    const myCourses = this.myAllocatedCourses();
-
-    return allNotices.filter(n => {
-      if (n.status !== 'Published') return false;
-
-      // Audience check
-      if (n.audience === 'All' || n.audience === 'Faculty') return true;
-      if (n.audience === 'Course-wise' && n.courseId && myCourses.has(n.courseId)) return true;
-      return false;
-    });
-  });
+  protected readonly eligibleNotices = this.facade.facultyNotices;
 
   // Filtered and sorted notices
   protected readonly filteredNotices = computed(() => {
     let list = this.eligibleNotices();
-    const q = this.searchQuery.trim().toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
     const tab = this.activeTab();
 
     if (q) {
@@ -227,12 +200,15 @@ export class FacultyNoticesPage {
       list = list.filter(n => n.isPinned);
     }
 
-    // Sort pinned notices on top, then by date descending
     return [...list].sort((a, b) => {
       if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       return new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime();
     });
   });
+
+  protected onSearchInput(event: Event): void {
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
 
   protected openNotice(notice: Notice): void {
     this.selectedNotice.set(notice);

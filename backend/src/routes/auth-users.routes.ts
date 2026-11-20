@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  adminFirebaseLogin,
   adminForgotPassword,
   adminLoginStep1,
   adminResend2FA,
@@ -22,6 +23,7 @@ const router = Router();
 
 // Public Admin Secure Login & 2FA Verification Endpoints
 router.post('/admin/login', adminLoginStep1);
+router.post('/admin/firebase-login', adminFirebaseLogin);
 router.post('/admin/verify-2fa', adminVerify2FA);
 router.post('/admin/resend-2fa', adminResend2FA);
 router.post('/admin/forgot-password', adminForgotPassword);

@@ -53,11 +53,15 @@ import { FacultyTimetablePage } from './pages/faculty/timetable/faculty-timetabl
 import { FacultyAttendancePage } from './pages/faculty/attendance/faculty-attendance';
 import { FacultyAssignmentsPage } from './pages/faculty/assignments/faculty-assignments';
 import { FacultyAssignmentSubmissionsPage } from './pages/faculty/assignments/faculty-assignment-submissions';
+import { FacultyQuestionPapersPage } from './pages/faculty/question-papers/faculty-question-papers';
+import { FacultyAnswerSheetsPage } from './pages/faculty/answer-sheets/faculty-answer-sheets';
 import { FacultyResultsMarksPage } from './pages/faculty/results/faculty-results-marks';
 import { FacultyStudentsPage } from './pages/faculty/students/faculty-students';
 import { FacultyNoticesPage } from './pages/faculty/notices/faculty-notices';
 import { FacultyMessageCenterPage } from './pages/faculty/message-center/faculty-message-center';
 import { FacultyMyProfilePage } from './pages/faculty/my-profile/faculty-my-profile';
+import { FacultyPortalReportsPage } from './pages/faculty/reports/faculty-reports';
+import { FacultyHelpdeskPage } from './pages/faculty/helpdesk/faculty-helpdesk';
 import { DashboardShell } from './pages/dashboard-shell/dashboard-shell';
 import { authGuard, authChildGuard, authMatchGuard, guestGuard } from './guards/auth.guard';
 import { roleGuard, roleChildGuard, dashboardRedirectGuard } from './guards/role.guard';
@@ -132,11 +136,15 @@ export const routes: Routes = [
       { path: 'attendance', component: FacultyAttendancePage },
       { path: 'assignments', component: FacultyAssignmentsPage },
       { path: 'assignments/:assignmentId/submissions', component: FacultyAssignmentSubmissionsPage },
+      { path: 'question-papers', component: FacultyQuestionPapersPage },
+      { path: 'answer-sheets', component: FacultyAnswerSheetsPage },
       { path: 'results-marks', component: FacultyResultsMarksPage },
+      { path: 'reports', component: FacultyPortalReportsPage },
       { path: 'my-students', component: FacultyStudentsPage },
       { path: 'notices', component: FacultyNoticesPage },
       { path: 'message-center', component: FacultyMessageCenterPage },
       { path: 'messages', redirectTo: 'message-center' },
+      { path: 'helpdesk', component: FacultyHelpdeskPage },
       { path: 'my-profile', component: FacultyMyProfilePage },
       { path: 'profile', redirectTo: 'my-profile' }
     ]

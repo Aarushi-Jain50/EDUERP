@@ -14,7 +14,7 @@ interface CalendarDayCell {
   imports: [MatIconModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="p-5 space-y-5">
+    <div class="p-3.5 sm:p-5 space-y-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <button
@@ -25,7 +25,7 @@ interface CalendarDayCell {
           >
             <mat-icon class="text-base">chevron_left</mat-icon>
           </button>
-          <span class="text-sm font-bold text-[#172554] min-w-[140px] text-center">
+          <span class="text-sm font-bold text-[#172554] min-w-[125px] sm:min-w-[140px] text-center">
             {{ monthLabel() }}
           </span>
           <button
@@ -38,7 +38,7 @@ interface CalendarDayCell {
           </button>
         </div>
 
-        <div class="flex items-center gap-4 text-xs text-[#64748B]">
+        <div class="flex items-center gap-3 sm:gap-4 flex-wrap text-xs text-[#64748B]">
           <span class="inline-flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Present
           </span>
@@ -52,16 +52,16 @@ interface CalendarDayCell {
       </div>
 
       <!-- Month Grid -->
-      <div class="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
+      <div class="grid grid-cols-7 gap-1 sm:gap-2 text-center">
         @for (wk of weekHeaders; track wk) {
-          <div class="py-1.5 text-[11px] font-semibold uppercase text-[#64748B]">{{ wk }}</div>
+          <div class="py-1.5 text-[10px] sm:text-[11px] font-semibold uppercase text-[#64748B]">{{ wk }}</div>
         }
 
         @for (cell of calendarCells(); track cell.isoDate) {
           <button
             type="button"
             (click)="selectDate(cell.isoDate)"
-            class="p-2 min-h-[60px] rounded-xl border text-left flex flex-col justify-between transition-colors cursor-pointer"
+            class="p-1.5 sm:p-2 min-h-[46px] sm:min-h-[60px] rounded-xl border text-left flex flex-col justify-between transition-colors cursor-pointer"
             [class]="selectedDate() === cell.isoDate
               ? 'border-[#6D42E8] bg-purple-50/70'
               : cell.inCurrentMonth

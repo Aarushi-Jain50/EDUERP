@@ -13,8 +13,10 @@ import {
   findAuthUserByUsername,
   findChallengeByIdAndUser,
   findLatestActivePasswordResetChallenge,
+  findOrProvisionGoogleAdmin,
   hashPassword,
   insertPublicAuthUser,
+  isAuthorizedAdminEmail,
   issueOtpChallenge,
   listAuthAuditLogs,
   listAuthUsers,
@@ -27,6 +29,7 @@ import {
   revokeSession,
   toSafeUser,
   updateAdminPassword,
+  upsertRuntimePortalUser,
   validateStrongPassword,
   verifyChallengeToken,
   verifyJwt,
@@ -35,7 +38,6 @@ import {
   verifyTotpCode
 } from '../db/auth-store';
 import { adminAuth } from '../../../src/lib/firebase-admin.ts';
-import { getOrCreateUser, getUserByUid, upsertPortalUserAccount } from '../../../src/db/users.ts';
 
 function getClientIp(req: Request): string {
   const fwd = req.headers['x-forwarded-for'];
@@ -88,9 +90,12 @@ export const adminLoginStep1 = async (req: Request, res: Response): Promise<void
         ip,
         details: 'Invalid email or non-admin account rejected.'
       });
+      const hasBootstrap = Boolean(process.env['ADMIN_BOOTSTRAP_EMAIL'] && process.env['ADMIN_BOOTSTRAP_PASSWORD']);
       res.status(401).json({
         success: false,
-        message: 'Invalid administrator credentials.'
+        message: !hasBootstrap && isAuthorizedAdminEmail(email)
+          ? 'No password credentials are set for this environment. Please use "Sign in with Google (Firebase Auth)" below.'
+          : 'Invalid administrator credentials.'
       });
       return;
     }
@@ -625,19 +630,6 @@ export const registerPublicUser = async (req: Request, res: Response): Promise<v
       createdAt
     });
 
-    const profileType =
-      rawRole === RbacRole.FACULTY ? 'Faculty' : rawRole === RbacRole.PARENT ? 'Parent' : 'Student';
-
-    await upsertPortalUserAccount({
-      id,
-      name: fullName,
-      username,
-      email,
-      passwordHash,
-      role: rawRole,
-      profileType
-    });
-
     const metaParts = [
       identifierCode ? `id=${identifierCode}` : '',
       departmentOrProgram ? `unit=${departmentOrProgram}` : ''
@@ -666,7 +658,86 @@ export const registerPublicUser = async (req: Request, res: Response): Promise<v
     });
   } catch (error) {
     console.error('Error in registerPublicUser:', error);
-    res.status(500).json({ success: false, message: 'Failed to register account in Cloud SQL.' });
+    res.status(500).json({ success: false, message: 'Failed to register account.' });
+  }
+};
+
+export const adminFirebaseLogin = async (req: Request, res: Response): Promise<void> => {
+  const token = extractRequestToken(req);
+  const ip = getClientIp(req);
+
+  if (!token) {
+    res.status(401).json({ success: false, message: 'Missing Firebase ID token.' });
+    return;
+  }
+
+  try {
+    const decoded = await adminAuth.verifyIdToken(token);
+    const email = (decoded.email ?? '').trim().toLowerCase();
+
+    if (!email || !decoded.email_verified) {
+      await logAudit({
+        email,
+        role: 'ADMIN',
+        event: 'ADMIN_LOGIN_FIREBASE_GOOGLE',
+        status: 'BLOCKED',
+        ip,
+        details: 'Firebase token missing verified email.'
+      });
+      res.status(403).json({
+        success: false,
+        message: 'Your Google account email must be verified for Admin access.'
+      });
+      return;
+    }
+
+    if (!isAuthorizedAdminEmail(email)) {
+      await logAudit({
+        email,
+        role: 'ADMIN',
+        event: 'ADMIN_LOGIN_FIREBASE_GOOGLE',
+        status: 'BLOCKED',
+        ip,
+        details: 'Google account is not in the authorized Admin allowlist.'
+      });
+      res.status(403).json({
+        success: false,
+        message: `Access denied: ${email} is not registered as an institutional Administrator.`
+      });
+      return;
+    }
+
+    const displayName =
+      typeof decoded['name'] === 'string' && decoded['name'].trim()
+        ? decoded['name'].trim()
+        : email.split('@')[0];
+
+    const adminUser = await findOrProvisionGoogleAdmin(email, displayName, decoded.uid);
+    const session = await createSession(adminUser, String(req.headers['user-agent'] || ''));
+    setAuthCookie(res, session.token);
+
+    await logAudit({
+      userId: adminUser.id,
+      email: adminUser.email,
+      role: adminUser.role,
+      event: 'ADMIN_LOGIN_FIREBASE_GOOGLE',
+      status: 'SUCCESS',
+      ip,
+      details: 'Authenticated via Firebase Google Auth.'
+    });
+
+    res.json({
+      success: true,
+      token: session.token,
+      expiresAt: session.expiresAt,
+      user: toSafeUser(adminUser)
+    });
+  } catch (error) {
+    console.error('Error in adminFirebaseLogin:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Failed to verify Firebase Admin authentication token.'
+    });
   }
 };
 
@@ -697,42 +768,27 @@ export const firebaseSyncUser = async (req: Request, res: Response): Promise<voi
         ? decoded['name'].trim()
         : email.split('@')[0];
 
-    const existingUser = await getUserByUid(decoded.uid);
-    const effectiveRole = existingUser?.role === RbacRole.ADMIN ? RbacRole.ADMIN : safeRequestedRole;
-    const synced = await getOrCreateUser(decoded.uid, email, displayName, effectiveRole);
+    const effectiveRole =
+      decoded.email_verified && isAuthorizedAdminEmail(email) ? RbacRole.ADMIN : safeRequestedRole;
 
-    const profileType =
-      effectiveRole === RbacRole.ADMIN
-        ? 'Staff'
-        : effectiveRole === RbacRole.FACULTY
-          ? 'Faculty'
-          : effectiveRole === RbacRole.PARENT
-            ? 'Parent'
-            : 'Student';
-
-    const cleanHandle = displayName.toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'user';
-    await upsertPortalUserAccount({
-      id: `usr-${decoded.uid.slice(0, 12)}`,
-      firebaseUid: decoded.uid,
-      name: displayName,
-      username: `${cleanHandle}_${decoded.uid.slice(0, 4)}`.slice(0, 40),
+    const synced = await upsertRuntimePortalUser({
+      uid: decoded.uid,
       email,
-      passwordHash: 'firebase-oauth',
-      role: effectiveRole,
-      profileType
+      name: displayName,
+      role: effectiveRole
     });
 
     res.json({
       success: true,
       user: {
-        uid: synced.uid,
+        uid: decoded.uid,
         email: synced.email,
         name: synced.name || displayName,
-        role: effectiveRole
+        role: synced.role
       }
     });
   } catch (error) {
-    console.error('Failed to verify Firebase token or sync Cloud SQL user:', error);
+    console.error('Failed to verify Firebase token:', error);
     res.status(401).json({
       success: false,
       message: 'Failed to authenticate Google session.'

@@ -135,6 +135,30 @@ export class AuthSessionService {
     return response.user;
   }
 
+  async adminFirebaseLogin(persistSession = false): Promise<AdminVerify2FAResponse> {
+    if (!isPlatformBrowser(this.platformId)) {
+      throw new Error('Firebase Admin Sign-In is only available in the browser.');
+    }
+
+    const credential = await signInWithPopup(auth, googleAuthProvider);
+    const idToken = await credential.user.getIdToken();
+    this.firebaseIdToken.set(idToken);
+
+    const response = await firstValueFrom(
+      this.http.post<AdminVerify2FAResponse>(
+        '/api/v1/auth/admin/firebase-login',
+        {},
+        { headers: { Authorization: `Bearer ${idToken}` } }
+      )
+    );
+
+    if (response.success && response.token) {
+      this.setToken(response.token, persistSession);
+      this.adminUser.set(response.user);
+    }
+    return response;
+  }
+
   adminLoginStep1(email: string, password: string): Observable<AdminLoginStep1Response> {
     return this.http.post<AdminLoginStep1Response>('/api/v1/auth/admin/login', {
       email,

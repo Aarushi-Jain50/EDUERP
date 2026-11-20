@@ -88,18 +88,18 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
                 </div>
 
                 <!-- Key Metrics Row: Attendance % & Fee Due -->
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 sm:gap-4">
                   <div class="p-3.5 rounded-xl bg-slate-50 border border-[#E2E8F0] min-w-0">
-                    <div class="flex items-center justify-between gap-1">
+                    <div class="flex items-center justify-between gap-1.5 flex-wrap">
                       <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Attendance</p>
                       @if (item.isLowAttendance) {
-                        <span class="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold">
+                        <span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold whitespace-nowrap shrink-0">
                           Low
                         </span>
                       }
                     </div>
                     <p
-                      class="text-lg font-bold mt-1 tabular-nums"
+                      class="text-base sm:text-lg font-bold mt-1 tabular-nums"
                       [class]="item.isLowAttendance ? 'text-rose-600' : 'text-[#172554]'"
                     >
                       {{ item.overallAttendancePct }}%
@@ -108,19 +108,19 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
                   </div>
 
                   <div class="p-3.5 rounded-xl bg-slate-50 border border-[#E2E8F0] min-w-0">
-                    <div class="flex items-center justify-between gap-1">
+                    <div class="flex items-center justify-between gap-1.5 flex-wrap">
                       <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Fee Due</p>
                       @if (item.feeSummary.overdueCount > 0) {
-                        <span class="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold">
+                        <span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold whitespace-nowrap shrink-0">
                           Overdue
                         </span>
                       }
                     </div>
                     <p
-                      class="text-lg font-bold mt-1 tabular-nums"
+                      class="text-base sm:text-lg font-bold mt-1 tabular-nums break-words"
                       [class]="item.feeSummary.due > 0 ? 'text-rose-600' : 'text-emerald-700'"
                     >
-                      ₹{{ facade.formatINR(item.feeSummary.due) }}
+                      {{ facade.formatINR(item.feeSummary.due) }}
                     </p>
                     <p class="text-[11px] text-[#64748B] mt-0.5 truncate">
                       {{ item.feeSummary.nextDueDate ? 'Due ' + facade.formatShortDate(item.feeSummary.nextDueDate!) : 'No balance due' }}

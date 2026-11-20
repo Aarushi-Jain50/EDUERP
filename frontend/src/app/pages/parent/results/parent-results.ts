@@ -50,56 +50,56 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
         </div>
 
         <!-- 4 Stat Cards: SGPA, CGPA, Pass %, Backlogs -->
-        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm flex items-center justify-between gap-3">
-            <div>
+        <section class="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div class="bg-white rounded-xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-2.5">
+            <div class="min-w-0">
               <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">SGPA</p>
-              <p class="text-2xl font-bold text-[#172554] mt-1 tabular-nums">
+              <p class="text-xl sm:text-2xl font-bold text-[#172554] mt-1 tabular-nums">
                 {{ semesterResults().length > 0 ? sgpa().toFixed(2) : 'N/A' }}
               </p>
-              <p class="text-[11px] text-[#64748B] mt-0.5">{{ selectedSemester() === 'All' ? 'Across semesters' : selectedSemester() }}</p>
+              <p class="text-[11px] text-[#64748B] mt-0.5 truncate">{{ selectedSemester() === 'All' ? 'Across semesters' : selectedSemester() }}</p>
             </div>
             <div class="w-9 h-9 rounded-xl bg-purple-50 text-[#6D42E8] border border-purple-100 flex items-center justify-center shrink-0">
               <mat-icon class="text-lg">grade</mat-icon>
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm flex items-center justify-between gap-3">
-            <div>
+          <div class="bg-white rounded-xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-2.5">
+            <div class="min-w-0">
               <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">CGPA</p>
-              <p class="text-2xl font-bold text-[#172554] mt-1 tabular-nums">
+              <p class="text-xl sm:text-2xl font-bold text-[#172554] mt-1 tabular-nums">
                 {{ allPublished().length > 0 ? cgpa().toFixed(2) : 'N/A' }}
               </p>
-              <p class="text-[11px] text-[#64748B] mt-0.5">Cumulative grade point</p>
+              <p class="text-[11px] text-[#64748B] mt-0.5 truncate">Cumulative grade point</p>
             </div>
             <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
               <mat-icon class="text-lg">workspace_premium</mat-icon>
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm flex items-center justify-between gap-3">
-            <div>
+          <div class="bg-white rounded-xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-2.5">
+            <div class="min-w-0">
               <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Pass %</p>
-              <p class="text-2xl font-bold text-emerald-700 mt-1 tabular-nums">
+              <p class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1 tabular-nums">
                 {{ semesterResults().length > 0 ? passPct() + '%' : 'N/A' }}
               </p>
-              <p class="text-[11px] text-[#64748B] mt-0.5">Threshold {{ facade.passingPercentage() }}%</p>
+              <p class="text-[11px] text-[#64748B] mt-0.5 truncate">Threshold {{ facade.passingPercentage() }}%</p>
             </div>
             <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
               <mat-icon class="text-lg">verified</mat-icon>
             </div>
           </div>
 
-          <div class="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm flex items-center justify-between gap-3">
-            <div>
+          <div class="bg-white rounded-xl border border-[#E2E8F0] p-3.5 sm:p-4 shadow-sm flex items-center justify-between gap-2.5">
+            <div class="min-w-0">
               <p class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Backlogs</p>
               <p
-                class="text-2xl font-bold mt-1 tabular-nums"
+                class="text-xl sm:text-2xl font-bold mt-1 tabular-nums"
                 [class]="backlogsCount() > 0 ? 'text-rose-600' : 'text-[#172554]'"
               >
                 {{ backlogsCount() }}
               </p>
-              <p class="text-[11px] text-[#64748B] mt-0.5">Unpassed subjects</p>
+              <p class="text-[11px] text-[#64748B] mt-0.5 truncate">Unpassed subjects</p>
             </div>
             <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0">
               <mat-icon class="text-lg">warning</mat-icon>
@@ -115,17 +115,41 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
               <span class="text-xs font-semibold text-[#64748B]">{{ semesterResults().length }} Published</span>
             </div>
 
-            <div class="overflow-x-auto">
+            <!-- Mobile Card View (< md) -->
+            <div class="md:hidden divide-y divide-[#E2E8F0]">
+              @for (res of semesterResults(); track res.record.id) {
+                <div class="p-4 space-y-2.5">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="font-semibold text-[#172554]">{{ res.subjectName }}</p>
+                      <p class="text-[11px] font-mono text-[#64748B] mt-0.5">{{ res.subjectCode }} · {{ res.examTitle }}</p>
+                    </div>
+                    <app-status-badge [status]="res.passed ? 'Pass' : 'Fail'" />
+                  </div>
+                  <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <span class="text-[#64748B] tabular-nums">
+                      Marks: <strong class="text-[#172554]">{{ res.record.marksObtained }}</strong>/{{ res.record.maxMarks }} ({{ res.percentage }}%)
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#6D42E8] border border-purple-200 text-xs font-bold whitespace-nowrap">
+                      Grade {{ res.grade }}
+                    </span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Desktop Table View (>= md) -->
+            <div class="hidden md:block overflow-x-auto">
               <table class="w-full text-left border-collapse">
                 <thead class="bg-slate-50 border-b border-[#E2E8F0]">
                   <tr class="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">
-                    <th scope="col" class="px-4 py-3">Subject</th>
-                    <th scope="col" class="px-4 py-3">Exam</th>
-                    <th scope="col" class="px-4 py-3 text-right">Marks</th>
-                    <th scope="col" class="px-4 py-3 text-right">Max</th>
-                    <th scope="col" class="px-4 py-3 text-right">%</th>
-                    <th scope="col" class="px-4 py-3 text-center">Grade</th>
-                    <th scope="col" class="px-4 py-3 text-right">Result</th>
+                    <th scope="col" class="px-4 py-3 whitespace-nowrap">Subject</th>
+                    <th scope="col" class="px-4 py-3 whitespace-nowrap">Exam</th>
+                    <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Marks</th>
+                    <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Max</th>
+                    <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">%</th>
+                    <th scope="col" class="px-4 py-3 text-center whitespace-nowrap">Grade</th>
+                    <th scope="col" class="px-4 py-3 text-right whitespace-nowrap">Result</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-[#E2E8F0] text-[13px]">
@@ -139,15 +163,15 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
                         <p class="font-medium text-[#172554]">{{ res.examTitle }}</p>
                         <p class="text-[11px] text-[#64748B]">{{ res.semester }} · {{ facade.formatShortDate(res.examDate) }}</p>
                       </td>
-                      <td class="px-4 py-3.5 text-right tabular-nums font-bold text-[#172554]">{{ res.record.marksObtained }}</td>
-                      <td class="px-4 py-3.5 text-right tabular-nums text-[#64748B]">{{ res.record.maxMarks }}</td>
-                      <td class="px-4 py-3.5 text-right tabular-nums font-semibold text-[#172554]">{{ res.percentage }}%</td>
-                      <td class="px-4 py-3.5 text-center">
-                        <span class="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#6D42E8] border border-purple-200 text-xs font-bold">
+                      <td class="px-4 py-3.5 text-right tabular-nums font-bold text-[#172554] whitespace-nowrap">{{ res.record.marksObtained }}</td>
+                      <td class="px-4 py-3.5 text-right tabular-nums text-[#64748B] whitespace-nowrap">{{ res.record.maxMarks }}</td>
+                      <td class="px-4 py-3.5 text-right tabular-nums font-semibold text-[#172554] whitespace-nowrap">{{ res.percentage }}%</td>
+                      <td class="px-4 py-3.5 text-center whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-purple-50 text-[#6D42E8] border border-purple-200 text-xs font-bold whitespace-nowrap">
                           {{ res.grade }}
                         </span>
                       </td>
-                      <td class="px-4 py-3.5 text-right">
+                      <td class="px-4 py-3.5 text-right whitespace-nowrap">
                         <app-status-badge [status]="res.passed ? 'Pass' : 'Fail'" />
                       </td>
                     </tr>

@@ -198,6 +198,7 @@ interface SubjectCardSummary {
                     <span class="px-2 py-0.5 rounded-lg bg-slate-100 font-mono text-[11px] font-semibold text-[#172554] whitespace-nowrap">
                       {{ item.subjectCode }}
                     </span>
+                    <app-status-badge [status]="item.assignment.taskType || 'Assignment'" />
                     <h2 class="text-sm font-bold text-[#172554] group-hover:text-[#6D42E8] transition-colors">
                       {{ item.assignment.title }}
                     </h2>
@@ -260,7 +261,7 @@ interface SubjectCardSummary {
                   @if (item.bucket !== 'Submitted') {
                     <span class="w-full md:w-auto justify-center gradient-accent text-white px-4 py-2.5 md:py-2 rounded-xl text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 whitespace-nowrap">
                       <mat-icon class="text-sm">edit_note</mat-icon>
-                      <span>{{ item.displayStatus === 'Draft' ? 'Continue 25-Q Worksheet' : 'Open 25 Questions' }}</span>
+                      <span>{{ item.displayStatus === 'Draft' ? 'Continue Worksheet' : 'Open ' + item.totalQuestions + ' Questions' }}</span>
                     </span>
                   } @else {
                     <span class="w-full md:w-auto justify-center px-3.5 py-2.5 md:py-2 rounded-xl bg-slate-50 border border-[#E2E8F0] group-hover:border-[#6D42E8] text-xs font-semibold text-[#172554] group-hover:text-[#6D42E8] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap">

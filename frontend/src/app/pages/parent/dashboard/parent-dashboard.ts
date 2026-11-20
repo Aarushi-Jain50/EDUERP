@@ -71,6 +71,13 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
 
           <div class="relative z-10 shrink-0 flex items-center gap-2.5 flex-wrap">
             <a
+              routerLink="/parent/reports"
+              class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2.5 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
+            >
+              <mat-icon class="text-base text-indigo-300">analytics</mat-icon>
+              <span>Reports & PDF</span>
+            </a>
+            <a
               routerLink="/parent/my-children"
               class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
             >
@@ -163,13 +170,13 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
             </div>
           </div>
 
-          <!-- 4. Average Score / Published Results -->
+          <!-- 4. Current SGPA / CGPA & Average Score -->
           <div class="bg-gradient-to-br from-white to-emerald-50/40 p-4.5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between gap-3 relative overflow-hidden group hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between gap-2">
-              <div>
-                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Average Score</p>
+              <div class="min-w-0">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Current SGPA</p>
                 <p class="text-3xl font-extrabold text-slate-900 mt-1.5 tabular-nums">
-                  {{ data.averageMarksPct !== null ? data.averageMarksPct + '%' : 'N/A' }}
+                  {{ data.sgpa > 0 ? data.sgpa.toFixed(2) : (data.averageMarksPct !== null ? data.averageMarksPct + '%' : 'N/A') }}
                 </p>
               </div>
               <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
@@ -178,7 +185,11 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
             </div>
             <div class="space-y-1 pt-2 border-t border-slate-100">
               <p class="text-[11px] text-slate-600 truncate font-medium">
-                {{ data.publishedResults.length > 0 ? data.publishedResults.length + ' published results' : 'Awaiting publication' }}
+                @if (data.cgpa > 0) {
+                  CGPA {{ data.cgpa.toFixed(2) }} · Avg {{ data.averageMarksPct }}%
+                } @else {
+                  {{ data.publishedResults.length > 0 ? data.publishedResults.length + ' published results' : 'Awaiting publication' }}
+                }
               </p>
               <a routerLink="/parent/results" class="text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-0.5">
                 <span>Academic Results</span>
@@ -190,13 +201,13 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
           <!-- 5. Fee Dues -->
           <div class="bg-gradient-to-br from-white to-rose-50/40 p-4.5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col justify-between gap-3 relative overflow-hidden group hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
             <div class="flex items-start justify-between gap-2">
-              <div>
+              <div class="min-w-0">
                 <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Fee Balance Due</p>
                 <p
-                  class="text-3xl font-extrabold mt-1.5 tabular-nums"
+                  class="text-2xl sm:text-3xl font-extrabold mt-1.5 tabular-nums break-words"
                   [class]="data.feeSummary.due > 0 ? 'text-rose-600' : 'text-emerald-700'"
                 >
-                  ₹{{ facade.formatINR(data.feeSummary.due) }}
+                  {{ facade.formatINR(data.feeSummary.due) }}
                 </p>
               </div>
               <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0">
@@ -412,6 +423,98 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
             </div>
           }
         </section>
+
+        <!-- New Version 2.0 Feature: Attendance Trend & Institutional Helpdesk Banner -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Attendance Trend Summary Card -->
+          <section class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
+              <div>
+                <h2 class="text-sm font-bold text-slate-900">Attendance Trend Analytics</h2>
+                <p class="text-xs text-slate-500">Historical trajectory vs threshold ({{ data.attendanceThreshold }}%)</p>
+              </div>
+              <a routerLink="/parent/attendance" class="text-xs font-bold text-indigo-600 hover:underline inline-flex items-center gap-1">
+                <span>Calendar View</span>
+                <mat-icon class="text-sm">chevron_right</mat-icon>
+              </a>
+            </div>
+
+            @if (data.attendanceTrend.length > 0) {
+              <div class="space-y-3">
+                <div class="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between">
+                  <div>
+                    <p class="text-xs font-bold text-indigo-950">Current Standing</p>
+                    <p class="text-[11px] text-indigo-700">
+                      @if (data.isLowAttendance) {
+                        Requires improvement (Below {{ data.attendanceThreshold }}% threshold)
+                      } @else {
+                        Healthy attendance at {{ data.overallAttendancePct }}%
+                      }
+                    </p>
+                  </div>
+                  <span class="text-lg font-extrabold text-indigo-700 tabular-nums">{{ data.overallAttendancePct }}%</span>
+                </div>
+
+                <div class="space-y-1.5 pt-1">
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Recent Recorded Checkpoints</p>
+                  <div class="divide-y divide-slate-100 max-h-[160px] overflow-y-auto">
+                    @for (pt of data.attendanceTrend.slice(-4).reverse(); track pt.date) {
+                      <div class="py-2 flex items-center justify-between text-xs">
+                        <span class="font-medium text-slate-700">{{ pt.label }}</span>
+                        <div class="flex items-center gap-2">
+                          <div class="w-24 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-indigo-600 h-full rounded-full" [style.width.%]="pt.percentage"></div>
+                          </div>
+                          <span class="font-bold text-slate-900 tabular-nums w-10 text-right">{{ pt.percentage }}%</span>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <div class="p-6 text-center bg-slate-50 rounded-xl border border-slate-200/90 text-xs text-slate-500">
+                Attendance trend data will appear once sessions are logged.
+              </div>
+            }
+          </section>
+
+          <!-- Institutional Helpdesk & Support Card -->
+          <section class="bg-gradient-to-br from-[#0F172A] to-[#1E1B4B] text-white rounded-2xl border border-white/10 shadow-md p-5 sm:p-6 flex flex-col justify-between gap-4 relative overflow-hidden">
+            <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full aurora-glow pointer-events-none opacity-40"></div>
+            
+            <div class="space-y-2 relative z-10">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-400/30">
+                  24/7 Parent Helpdesk
+                </span>
+              </div>
+              <h2 class="text-base font-bold text-white">Have a query regarding fees, attendance, or academics?</h2>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Raise an administrative inquiry or request an attendance correction directly with the institutional desk. Our coordinators respond within 24 business hours.
+              </p>
+            </div>
+
+            <div class="relative z-10 pt-2 flex items-center gap-3 flex-wrap">
+              <a
+                routerLink="/parent/helpdesk"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+              >
+                <mat-icon class="text-base">support_agent</mat-icon>
+                <span>Open Helpdesk</span>
+              </a>
+              <a
+                routerLink="/parent/message-center"
+                class="bg-white/10 hover:bg-white/25 text-white px-4 py-2.5 rounded-xl text-xs font-semibold backdrop-blur-sm transition-all inline-flex items-center gap-2 cursor-pointer border border-white/20"
+              >
+                <mat-icon class="text-base">mail</mat-icon>
+                <span>Message Center</span>
+              </a>
+            </div>
+          </section>
+
+        </div>
 
         <!-- Executive Grid Row 3: Recent Results, Upcoming Exams & Campus Notices -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">

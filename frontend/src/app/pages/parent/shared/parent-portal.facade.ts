@@ -11,6 +11,8 @@ import { FinanceService } from '../../../services/finance.service';
 import { FacultyService } from '../../../services/faculty.service';
 import { CommunicationService } from '../../../services/communication.service';
 import { SettingsService } from '../../../services/settings.service';
+import { StudentsService } from '../../../services/students.service';
+import { AuditService } from '../../../services/audit.service';
 import { Student } from '../../../models/student.model';
 import { Notice } from '../../../models/communication.model';
 import { Payment } from '../../../models/finance.model';
@@ -186,6 +188,8 @@ export interface ChildOverviewSnapshot {
   upcomingExams: Examination[];
   publishedResults: ParentPublishedResult[];
   averageMarksPct: number | null;
+  sgpa: number;
+  cgpa: number;
   feeSummary: ParentFeeSummary;
   todaysTimetable: ParentTimetablePeriod[];
   notices: Notice[];
@@ -205,6 +209,8 @@ export class ParentPortalFacade {
   private readonly facultyService = inject(FacultyService);
   private readonly communicationService = inject(CommunicationService);
   private readonly settingsService = inject(SettingsService);
+  private readonly studentsService = inject(StudentsService);
+  private readonly auditService = inject(AuditService);
 
   readonly currentParent = this.childContext.currentParent;
   readonly linkedChildren = this.childContext.linkedChildren;
@@ -632,6 +638,75 @@ export class ParentPortalFacade {
     };
   });
 
+  payInstallmentsOnline(
+    installmentIds: string[],
+    mode: 'UPI' | 'Card' | 'Bank Transfer',
+    referenceNote?: string
+  ): Payment | null {
+    const child = this.selectedChild();
+    const parent = this.currentParent();
+    if (!child || installmentIds.length === 0) return null;
+
+    const feeDetail = this.selectedFeeDetail();
+    const targetRows = feeDetail.installmentRows.filter(
+      r => installmentIds.includes(r.installmentId) && r.balance > 0
+    );
+    if (targetRows.length === 0) return null;
+
+    const ledger = this.financeService.getLedgerByStudent(child.id);
+    if (!ledger) return null;
+
+    const items = targetRows.map(r => {
+      const ledgerInst = ledger.installments.find(i => i.installmentId === r.installmentId);
+      const pendingFine = Math.max(0, r.lateFine - (ledgerInst?.fineAmount || 0));
+      const principalAndExistingBalance = Math.max(0, r.balance - pendingFine);
+      return {
+        installmentId: r.installmentId,
+        amount: principalAndExistingBalance,
+        fine: pendingFine
+      };
+    });
+
+    const subtotal = items.reduce((acc, i) => acc + i.amount, 0);
+    const fine = items.reduce((acc, i) => acc + i.fine, 0);
+    const total = subtotal + fine;
+    const prefix = mode === 'UPI' ? 'UPI' : mode === 'Card' ? 'CARD' : 'NB';
+    const refNo = referenceNote?.trim() || `${prefix}-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const todayIso = new Date().toISOString().split('T')[0];
+
+    const payment = this.financeService.collectPayment({
+      studentId: child.id,
+      studentName: child.name,
+      courseName: child.course,
+      date: todayIso,
+      subtotal,
+      concession: 0,
+      fine,
+      total,
+      mode,
+      refNo,
+      items,
+      collectedBy: `Online Portal (${parent.name})`
+    });
+
+    this.auditService.log({
+      userId: parent.id,
+      userName: parent.name,
+      role: 'Parent',
+      module: 'Parent Fees',
+      action: 'Create',
+      target: `Online Payment ${payment.receiptNo} (${this.formatINR(total)})`,
+      status: 'Success'
+    });
+
+    this.studentsService.showToast(
+      'success',
+      `Payment of ${this.formatINR(total)} successful! Receipt ${payment.receiptNo} generated.`
+    );
+
+    return payment;
+  }
+
   // 7. Notices eligible for parent & selected child
   readonly selectedNotices = computed<Notice[]>(() => {
     const child = this.selectedChild();
@@ -953,6 +1028,33 @@ export class ParentPortalFacade {
         ? Math.round((publishedResults.reduce((acc, r) => acc + r.percentage, 0) / publishedResults.length) * 10) / 10
         : null;
 
+    const semGpaRows: { semester: string; credits: number; gradePoint: number }[] = this.resultsService
+      .results()
+      .filter(r => r.studentId === student.id && r.status === 'Published')
+      .map(r => {
+        const exam = examsById.get(r.examId);
+        const subject = exam ? subjectsById.get(exam.subjectId) : undefined;
+        const pct = r.maxMarks > 0 ? Math.round((r.marksObtained / r.maxMarks) * 100) : 0;
+        const gradeInfo = getGrade(pct);
+        return {
+          semester: exam?.semester || student.semester,
+          credits: subject?.credits ?? 4,
+          gradePoint: gradeInfo.point
+        };
+      });
+
+    const computeWeightedGpa = (rows: { credits: number; gradePoint: number }[]): number => {
+      if (rows.length === 0) return 0;
+      const totalCredits = rows.reduce((acc, r) => acc + r.credits, 0);
+      if (totalCredits === 0) return 0;
+      const weighted = rows.reduce((acc, r) => acc + r.gradePoint * r.credits, 0);
+      return Math.round((weighted / totalCredits) * 100) / 100;
+    };
+
+    const currentSemGpaRows = semGpaRows.filter(r => r.semester === student.semester);
+    const sgpa = computeWeightedGpa(currentSemGpaRows.length > 0 ? currentSemGpaRows : semGpaRows);
+    const cgpa = computeWeightedGpa(semGpaRows);
+
     const ledger = this.financeService.ledgers().find(l => l.studentId === student.id);
     const structure = ledger
       ? this.financeService.structures().find(s => s.id === ledger.structureId)
@@ -1105,7 +1207,7 @@ export class ParentPortalFacade {
         id: `alert-fee-${student.id}`,
         category: 'Fees',
         title: `Overdue Fee: ${feeSummary.firstOverdueLabel}`,
-        description: `₹${this.formatINR(feeSummary.firstOverdueAmount)} due since ${this.formatShortDate(feeSummary.firstOverdueDate)}. Pay at the accounts office.`,
+        description: `${this.formatINR(feeSummary.firstOverdueAmount)} due since ${this.formatShortDate(feeSummary.firstOverdueDate)}. Pay online via Fees & Receipts or at the accounts office.`,
         severity: 'Urgent',
         icon: 'account_balance_wallet',
         route: '/parent/fees'
@@ -1150,6 +1252,8 @@ export class ParentPortalFacade {
       upcomingExams,
       publishedResults,
       averageMarksPct,
+      sgpa,
+      cgpa,
       feeSummary,
       todaysTimetable,
       notices: notices.slice(0, 5),

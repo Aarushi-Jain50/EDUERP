@@ -13,6 +13,7 @@ import { OperationType, handleFirestoreError } from '../lib/firestore-errors';
 
 export type AssignmentStatus = 'Active' | 'Closed' | 'Overdue';
 export type SubmissionStatus = 'Draft' | 'Submitted' | 'Late' | 'Evaluated';
+export type AssignmentTaskType = 'Assignment' | 'Homework';
 
 export interface SubmissionAttachment {
   name: string;
@@ -33,6 +34,7 @@ export interface Assignment {
   id: string;
   title: string;
   description: string;
+  taskType?: AssignmentTaskType;
   subjectId: string;
   subjectName: string;
   sectionId: string;
@@ -77,11 +79,13 @@ export interface AssignmentRosterRow {
 }
 
 const SUBMISSIONS_STORAGE_KEY = 'eduerp_student_submissions_v1';
+const ASSIGNMENTS_STORAGE_KEY = 'eduerp_assignments_v1';
 
 const RAW_SEED_ASSIGNMENTS: Omit<Assignment, 'questions'>[] = [
   {
     id: 'as-1',
     title: 'Implementation of AVL Trees & Rotations',
+    taskType: 'Assignment',
     description:
       'Implement AVL Tree insertion, deletion, and LL/RR/LR/RL rotation logic in C++ and complete all 25 topic worksheet questions.',
     subjectId: 'sub-1',
@@ -262,6 +266,7 @@ const RAW_SEED_ASSIGNMENTS: Omit<Assignment, 'questions'>[] = [
   {
     id: 'as-9',
     title: 'Cloud IAM & VPC Security Audit',
+    taskType: 'Homework',
     description:
       'Draft least-privilege IAM policy JSON and subnet firewall rules, plus answer all 25 Cloud & DevOps worksheet questions.',
     subjectId: 'sub-4',
@@ -276,7 +281,8 @@ const RAW_SEED_ASSIGNMENTS: Omit<Assignment, 'questions'>[] = [
   },
   {
     id: 'as-10',
-    title: 'Graph Traversal & Shortest Path Lab',
+    title: 'Graph Traversal & Shortest Path Practice Sheet',
+    taskType: 'Homework',
     description:
       'Compare Dijkstra and Bellman-Ford performance on sparse and dense weighted graphs across 25 DSA questions.',
     subjectId: 'sub-1',
@@ -293,6 +299,7 @@ const RAW_SEED_ASSIGNMENTS: Omit<Assignment, 'questions'>[] = [
 
 const SEED_ASSIGNMENTS: Assignment[] = RAW_SEED_ASSIGNMENTS.map(a => ({
   ...a,
+  taskType: a.taskType ?? 'Assignment',
   questions: getQuestionsForSubject(a.subjectId, a.id),
 }));
 
@@ -410,7 +417,7 @@ export class AssignmentsService {
   private readonly facultyService = inject(FacultyService);
   private readonly notificationService = inject(NotificationService);
 
-  private readonly _assignments = signal<Assignment[]>(SEED_ASSIGNMENTS);
+  private readonly _assignments = signal<Assignment[]>(this.loadStoredAssignments());
   private readonly _submissions = signal<AssignmentSubmission[]>(this.loadStoredSubmissions());
 
   private readonly _evaluations = signal<Record<string, { marksObtained: number; feedback?: string }>>({
@@ -479,6 +486,38 @@ export class AssignmentsService {
           );
         }
       });
+    }
+  }
+
+  private loadStoredAssignments(): Assignment[] {
+    if (!isPlatformBrowser(this.platformId)) return SEED_ASSIGNMENTS;
+    try {
+      const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Assignment[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(a => ({
+            ...a,
+            taskType: a.taskType ?? 'Assignment',
+            questions:
+              a.questions && a.questions.length > 0
+                ? a.questions
+                : getQuestionsForSubject(a.subjectId, a.id),
+          }));
+        }
+      }
+    } catch {
+      // ignore invalid storage
+    }
+    return SEED_ASSIGNMENTS;
+  }
+
+  private persistLocalAssignments(list: Assignment[]): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      // ignore storage quota errors
     }
   }
 
@@ -953,44 +992,77 @@ export class AssignmentsService {
 
   add(assignment: Omit<Assignment, 'id'>): void {
     const newId = `as-${Date.now()}`;
-    this._assignments.update(list => [
-      {
-        ...assignment,
-        allowLateSubmission: assignment.allowLateSubmission ?? true,
-        id: newId,
-        questions: getQuestionsForSubject(assignment.subjectId, newId),
-      },
-      ...list,
-    ]);
-    this.studentsService.showToast('success', `Assignment "${assignment.title}" created.`);
+    const customQuestions = assignment.questions?.filter(q => q.prompt.trim().length > 0);
+    const resolvedQuestions: AssignmentQuestion[] =
+      customQuestions && customQuestions.length > 0
+        ? customQuestions.map((q, idx) => ({
+            ...q,
+            id: q.id || `${newId}-q${idx + 1}`,
+            number: idx + 1,
+          }))
+        : getQuestionsForSubject(assignment.subjectId, newId);
+
+    const record: Assignment = {
+      ...assignment,
+      taskType: assignment.taskType ?? 'Assignment',
+      allowLateSubmission: assignment.allowLateSubmission ?? true,
+      id: newId,
+      questions: resolvedQuestions,
+    };
+
+    this._assignments.update(list => {
+      const next = [record, ...list];
+      this.persistLocalAssignments(next);
+      return next;
+    });
+    const label = record.taskType === 'Homework' ? 'Homework' : 'Assignment';
+    this.studentsService.showToast('success', `${label} "${assignment.title}" created.`);
   }
 
   update(id: string, assignment: Omit<Assignment, 'id'>): void {
-    this._assignments.update(list =>
-      list.map(a =>
+    const customQuestions = assignment.questions?.filter(q => q.prompt.trim().length > 0);
+    const resolvedQuestions: AssignmentQuestion[] =
+      customQuestions && customQuestions.length > 0
+        ? customQuestions.map((q, idx) => ({
+            ...q,
+            id: q.id || `${id}-q${idx + 1}`,
+            number: idx + 1,
+          }))
+        : getQuestionsForSubject(assignment.subjectId, id);
+
+    this._assignments.update(list => {
+      const next = list.map(a =>
         a.id === id
           ? {
               ...assignment,
+              taskType: assignment.taskType ?? a.taskType ?? 'Assignment',
               allowLateSubmission: assignment.allowLateSubmission ?? true,
               id,
-              questions: getQuestionsForSubject(assignment.subjectId, id),
+              questions: resolvedQuestions,
             }
           : a
-      )
-    );
-    this.studentsService.showToast('success', `Assignment "${assignment.title}" updated.`);
+      );
+      this.persistLocalAssignments(next);
+      return next;
+    });
+    const label = assignment.taskType === 'Homework' ? 'Homework' : 'Assignment';
+    this.studentsService.showToast('success', `${label} "${assignment.title}" updated.`);
   }
 
   delete(id: string): void {
     const a = this._assignments().find(item => item.id === id);
-    this._assignments.update(list => list.filter(item => item.id !== id));
+    this._assignments.update(list => {
+      const next = list.filter(item => item.id !== id);
+      this.persistLocalAssignments(next);
+      return next;
+    });
     this._submissions.update(list => {
       const next = list.filter(s => s.assignmentId !== id);
       this.persistLocalSubmissions(next);
       return next;
     });
     if (a) {
-      this.studentsService.showToast('info', `Assignment "${a.title}" deleted.`);
+      this.studentsService.showToast('info', `${a.taskType || 'Assignment'} "${a.title}" deleted.`);
     }
   }
 }

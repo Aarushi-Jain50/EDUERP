@@ -1,13 +1,4 @@
 import crypto from 'node:crypto';
-import { and, desc, eq, or, sql } from 'drizzle-orm';
-import { db } from '../../../src/db/index.ts';
-import {
-  adminChallenges,
-  appConfig,
-  authAuditLogs,
-  authSessions,
-  authUsers
-} from '../../../src/db/schema.ts';
 
 export enum RbacRole {
   ADMIN = 'ADMIN',
@@ -18,6 +9,7 @@ export enum RbacRole {
 
 export interface AuthUserRecord {
   id: string;
+  uid?: string;
   name: string;
   username: string;
   email: string;
@@ -58,6 +50,39 @@ export interface SafeUserView {
   lastLogin: string | null;
 }
 
+interface ChallengeRecord {
+  id: string;
+  userId: string;
+  purpose: 'LOGIN_2FA' | 'PASSWORD_RESET';
+  otpHash: string;
+  expiresAt: number;
+  attempts: number;
+  used: boolean;
+  createdAt: string;
+}
+
+interface SessionRecord {
+  id: string;
+  userId: string;
+  role: RbacRole;
+  expiresAt: number;
+  revoked: boolean;
+  createdAt: string;
+  userAgent: string;
+}
+
+interface AuditLogRow {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  role: string | null;
+  event: string;
+  status: 'SUCCESS' | 'FAILURE' | 'BLOCKED';
+  ip: string;
+  details: string;
+  created_at: string;
+}
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const SESSION_TTL_SECONDS = 30 * 60;
@@ -65,78 +90,17 @@ const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const RESET_TTL_MS = 10 * 60 * 1000;
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
+// Primary project owner email authorized for Firebase Admin sign-in
+const DEFAULT_AUTHORIZED_ADMIN_EMAILS = ['jainwithchhavi@gmail.com'];
+
+// In-memory runtime store (replaces Cloud SQL auth tables; Firebase Auth + Firestore is the single DB)
+const usersById = new Map<string, AuthUserRecord>();
+const challengesById = new Map<string, ChallengeRecord>();
+const sessionsById = new Map<string, SessionRecord>();
+const auditLogsStore: AuditLogRow[] = [];
+
 let cachedSecret: string | null = null;
-let initPromise: Promise<void> | null = null;
-
-function mapAuthUserRow(row: typeof authUsers.$inferSelect): AuthUserRecord {
-  const upperRole = row.role.toUpperCase();
-  const role =
-    upperRole === RbacRole.ADMIN
-      ? RbacRole.ADMIN
-      : upperRole === RbacRole.FACULTY
-        ? RbacRole.FACULTY
-        : upperRole === RbacRole.PARENT
-          ? RbacRole.PARENT
-          : RbacRole.STUDENT;
-
-  const status =
-    row.status === 'Inactive' || row.status === 'Suspended' ? row.status : 'Active';
-
-  return {
-    id: row.id,
-    name: row.name,
-    username: row.username,
-    email: row.email,
-    passwordHash: row.passwordHash,
-    role,
-    isSuperAdmin: Boolean(row.isSuperAdmin),
-    status,
-    totpEnabled: Boolean(row.totpEnabled),
-    totpSecret: row.totpSecret,
-    failedAttempts: row.failedAttempts,
-    lockedUntil: row.lockedUntil ?? null,
-    lastLogin: row.lastLogin ?? null,
-    createdAt: row.createdAt,
-    createdBy: row.createdBy
-  };
-}
-
-async function resolveJwtSecretFromCloudSql(): Promise<string> {
-  if (cachedSecret) {
-    return cachedSecret;
-  }
-  const envSecret = process.env['JWT_SECRET']?.trim();
-  if (envSecret && envSecret.length >= 16) {
-    cachedSecret = envSecret;
-    return cachedSecret;
-  }
-
-  const existing = await db
-    .select({ value: appConfig.value })
-    .from(appConfig)
-    .where(eq(appConfig.key, 'jwt_secret'))
-    .limit(1);
-
-  if (existing[0]?.value && existing[0].value.length >= 32) {
-    cachedSecret = existing[0].value;
-    return cachedSecret;
-  }
-
-  const generated = crypto.randomBytes(48).toString('hex');
-  await db
-    .insert(appConfig)
-    .values({ key: 'jwt_secret', value: generated })
-    .onConflictDoNothing({ target: appConfig.key });
-
-  const stored = await db
-    .select({ value: appConfig.value })
-    .from(appConfig)
-    .where(eq(appConfig.key, 'jwt_secret'))
-    .limit(1);
-
-  cachedSecret = stored[0]?.value || generated;
-  return cachedSecret;
-}
+let initialized = false;
 
 export function getJwtSecret(): string {
   if (cachedSecret) {
@@ -151,7 +115,34 @@ export function getJwtSecret(): string {
   return cachedSecret;
 }
 
-async function bootstrapEnvAdmin(): Promise<void> {
+function getAuthorizedAdminEmails(): Set<string> {
+  const allowed = new Set<string>(DEFAULT_AUTHORIZED_ADMIN_EMAILS.map(e => e.toLowerCase()));
+  const bootstrapEmail = process.env['ADMIN_BOOTSTRAP_EMAIL']?.trim().toLowerCase();
+  if (bootstrapEmail) {
+    allowed.add(bootstrapEmail);
+  }
+  const extra = process.env['ADMIN_AUTHORIZED_EMAILS']?.trim();
+  if (extra) {
+    for (const part of extra.split(',')) {
+      const clean = part.trim().toLowerCase();
+      if (clean) allowed.add(clean);
+    }
+  }
+  for (const user of usersById.values()) {
+    if (user.role === RbacRole.ADMIN && user.status === 'Active') {
+      allowed.add(user.email.toLowerCase());
+    }
+  }
+  return allowed;
+}
+
+export function isAuthorizedAdminEmail(email: string): boolean {
+  const clean = email.trim().toLowerCase();
+  if (!clean) return false;
+  return getAuthorizedAdminEmails().has(clean);
+}
+
+function bootstrapEnvAdmin(): void {
   const email = process.env['ADMIN_BOOTSTRAP_EMAIL']?.trim().toLowerCase();
   const password = process.env['ADMIN_BOOTSTRAP_PASSWORD'];
   const name = process.env['ADMIN_BOOTSTRAP_NAME']?.trim() || 'System Administrator';
@@ -159,52 +150,41 @@ async function bootstrapEnvAdmin(): Promise<void> {
     return;
   }
 
-  const existing = await db
-    .select({ id: authUsers.id })
-    .from(authUsers)
-    .where(sql`lower(${authUsers.email}) = ${email}`)
-    .limit(1);
-
-  if (existing.length > 0) {
-    return;
+  for (const existing of usersById.values()) {
+    if (existing.email.toLowerCase() === email) {
+      return;
+    }
   }
 
   const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'admin_eduerp';
   const totpSecret = process.env['ADMIN_TOTP_SECRET']?.trim().toUpperCase() || generateBase32Secret();
+  const id = `usr-adm-${crypto.randomUUID().slice(0, 8)}`;
 
-  await db
-    .insert(authUsers)
-    .values({
-      id: `usr-adm-${crypto.randomUUID().slice(0, 8)}`,
-      name,
-      username,
-      email,
-      passwordHash: hashPassword(password),
-      role: RbacRole.ADMIN,
-      isSuperAdmin: true,
-      status: 'Active',
-      totpEnabled: true,
-      totpSecret,
-      failedAttempts: 0,
-      lockedUntil: null,
-      lastLogin: null,
-      createdAt: new Date().toISOString(),
-      createdBy: 'env-bootstrap'
-    })
-    .onConflictDoNothing();
+  usersById.set(id, {
+    id,
+    name,
+    username,
+    email,
+    passwordHash: hashPassword(password),
+    role: RbacRole.ADMIN,
+    isSuperAdmin: true,
+    status: 'Active',
+    totpEnabled: true,
+    totpSecret,
+    failedAttempts: 0,
+    lockedUntil: null,
+    lastLogin: null,
+    createdAt: new Date().toISOString(),
+    createdBy: 'env-bootstrap'
+  });
 }
 
 export async function ensureAuthReady(): Promise<void> {
-  if (!initPromise) {
-    initPromise = (async () => {
-      await resolveJwtSecretFromCloudSql();
-      await bootstrapEnvAdmin();
-    })().catch((err) => {
-      initPromise = null;
-      throw err;
-    });
+  if (!initialized) {
+    getJwtSecret();
+    bootstrapEnvAdmin();
+    initialized = true;
   }
-  await initPromise;
 }
 
 export function hashPassword(plain: string): string {
@@ -430,50 +410,125 @@ export function toSafeUser(u: AuthUserRecord): SafeUserView {
 export async function findAuthUserByEmail(email: string): Promise<AuthUserRecord | null> {
   await ensureAuthReady();
   const cleanEmail = email.trim().toLowerCase();
-  const rows = await db
-    .select()
-    .from(authUsers)
-    .where(sql`lower(${authUsers.email}) = ${cleanEmail}`)
-    .limit(1);
-  return rows[0] ? mapAuthUserRow(rows[0]) : null;
+  for (const user of usersById.values()) {
+    if (user.email.toLowerCase() === cleanEmail) {
+      return user;
+    }
+  }
+  return null;
 }
 
 export async function findActiveAdminByEmail(email: string): Promise<AuthUserRecord | null> {
   await ensureAuthReady();
   const cleanEmail = email.trim().toLowerCase();
-  const rows = await db
-    .select()
-    .from(authUsers)
-    .where(
-      and(
-        sql`lower(${authUsers.email}) = ${cleanEmail}`,
-        eq(authUsers.role, RbacRole.ADMIN),
-        eq(authUsers.status, 'Active')
-      )
-    )
-    .limit(1);
-  return rows[0] ? mapAuthUserRow(rows[0]) : null;
+  for (const user of usersById.values()) {
+    if (
+      user.email.toLowerCase() === cleanEmail &&
+      user.role === RbacRole.ADMIN &&
+      user.status === 'Active'
+    ) {
+      return user;
+    }
+  }
+  return null;
 }
 
 export async function findAuthUserById(id: string): Promise<AuthUserRecord | null> {
   await ensureAuthReady();
-  const rows = await db
-    .select()
-    .from(authUsers)
-    .where(eq(authUsers.id, id))
-    .limit(1);
-  return rows[0] ? mapAuthUserRow(rows[0]) : null;
+  return usersById.get(id) ?? null;
 }
 
 export async function findAuthUserByUsername(username: string): Promise<AuthUserRecord | null> {
   await ensureAuthReady();
   const clean = username.trim().toLowerCase();
-  const rows = await db
-    .select()
-    .from(authUsers)
-    .where(sql`lower(${authUsers.username}) = ${clean}`)
-    .limit(1);
-  return rows[0] ? mapAuthUserRow(rows[0]) : null;
+  for (const user of usersById.values()) {
+    if (user.username.toLowerCase() === clean) {
+      return user;
+    }
+  }
+  return null;
+}
+
+export async function findOrProvisionGoogleAdmin(
+  email: string,
+  name: string,
+  uid: string
+): Promise<AuthUserRecord> {
+  await ensureAuthReady();
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = await findAuthUserByEmail(cleanEmail);
+  if (existing) {
+    existing.uid = uid;
+    existing.role = RbacRole.ADMIN;
+    existing.isSuperAdmin = true;
+    existing.status = 'Active';
+    if (name.trim()) existing.name = name.trim();
+    return existing;
+  }
+
+  const baseHandle = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'admin';
+  const id = `usr-adm-${uid.slice(0, 10)}`;
+  const record: AuthUserRecord = {
+    id,
+    uid,
+    name: name.trim() || 'System Administrator',
+    username: `${baseHandle}_${uid.slice(0, 4)}`.slice(0, 40),
+    email: cleanEmail,
+    passwordHash: 'firebase-oauth',
+    role: RbacRole.ADMIN,
+    isSuperAdmin: true,
+    status: 'Active',
+    totpEnabled: true,
+    totpSecret: generateBase32Secret(),
+    failedAttempts: 0,
+    lockedUntil: null,
+    lastLogin: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    createdBy: 'firebase-auth'
+  };
+  usersById.set(id, record);
+  return record;
+}
+
+export async function upsertRuntimePortalUser(input: {
+  uid: string;
+  email: string;
+  name: string;
+  role: RbacRole;
+}): Promise<AuthUserRecord> {
+  await ensureAuthReady();
+  const cleanEmail = input.email.trim().toLowerCase();
+  const existing = await findAuthUserByEmail(cleanEmail);
+  if (existing) {
+    existing.uid = input.uid;
+    if (input.name.trim()) existing.name = input.name.trim();
+    existing.lastLogin = new Date().toISOString();
+    return existing;
+  }
+
+  const baseHandle = (input.name || cleanEmail.split('@')[0]).toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'user';
+  const id = `fb-${input.uid}`;
+  const isAdmin = isAuthorizedAdminEmail(cleanEmail);
+  const record: AuthUserRecord = {
+    id,
+    uid: input.uid,
+    name: input.name.trim() || cleanEmail.split('@')[0],
+    username: `${baseHandle}_${input.uid.slice(0, 4)}`.slice(0, 40),
+    email: cleanEmail,
+    passwordHash: 'firebase-oauth',
+    role: isAdmin ? RbacRole.ADMIN : input.role,
+    isSuperAdmin: isAdmin,
+    status: 'Active',
+    totpEnabled: false,
+    totpSecret: '',
+    failedAttempts: 0,
+    lockedUntil: null,
+    lastLogin: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    createdBy: 'firebase-auth'
+  };
+  usersById.set(id, record);
+  return record;
 }
 
 export async function insertPublicAuthUser(input: {
@@ -486,11 +541,11 @@ export async function insertPublicAuthUser(input: {
   createdAt: string;
 }): Promise<void> {
   await ensureAuthReady();
-  await db.insert(authUsers).values({
+  usersById.set(input.id, {
     id: input.id,
     name: input.name,
     username: input.username,
-    email: input.email,
+    email: input.email.trim().toLowerCase(),
     passwordHash: input.passwordHash,
     role: input.role,
     isSuperAdmin: false,
@@ -507,18 +562,21 @@ export async function insertPublicAuthUser(input: {
 
 export async function resetAdminFailedAttempts(userId: string): Promise<void> {
   await ensureAuthReady();
-  await db
-    .update(authUsers)
-    .set({ failedAttempts: 0, lockedUntil: null })
-    .where(eq(authUsers.id, userId));
+  const user = usersById.get(userId);
+  if (user) {
+    user.failedAttempts = 0;
+    user.lockedUntil = null;
+  }
 }
 
 export async function updateAdminPassword(userId: string, passwordHash: string): Promise<void> {
   await ensureAuthReady();
-  await db
-    .update(authUsers)
-    .set({ passwordHash, failedAttempts: 0, lockedUntil: null })
-    .where(eq(authUsers.id, userId));
+  const user = usersById.get(userId);
+  if (user) {
+    user.passwordHash = passwordHash;
+    user.failedAttempts = 0;
+    user.lockedUntil = null;
+  }
 }
 
 export async function findChallengeByIdAndUser(
@@ -526,67 +584,39 @@ export async function findChallengeByIdAndUser(
   userId: string
 ): Promise<{ used: boolean; expiresAt: number } | null> {
   await ensureAuthReady();
-  const rows = await db
-    .select({ used: adminChallenges.used, expiresAt: adminChallenges.expiresAt })
-    .from(adminChallenges)
-    .where(and(eq(adminChallenges.id, challengeId), eq(adminChallenges.userId, userId)))
-    .limit(1);
-  return rows[0] ?? null;
+  const row = challengesById.get(challengeId);
+  if (!row || row.userId !== userId) return null;
+  return { used: row.used, expiresAt: row.expiresAt };
 }
 
 export async function findLatestActivePasswordResetChallenge(
   userId: string
 ): Promise<{ id: string } | null> {
   await ensureAuthReady();
-  const rows = await db
-    .select({ id: adminChallenges.id })
-    .from(adminChallenges)
-    .where(
-      and(
-        eq(adminChallenges.userId, userId),
-        eq(adminChallenges.purpose, 'PASSWORD_RESET'),
-        eq(adminChallenges.used, false)
-      )
-    )
-    .orderBy(desc(adminChallenges.createdAt))
-    .limit(1);
-  return rows[0] ?? null;
+  const matches = Array.from(challengesById.values())
+    .filter(c => c.userId === userId && c.purpose === 'PASSWORD_RESET' && !c.used)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return matches[0] ? { id: matches[0].id } : null;
 }
 
 export async function markChallengeUsed(challengeId: string): Promise<void> {
   await ensureAuthReady();
-  await db
-    .update(adminChallenges)
-    .set({ used: true })
-    .where(eq(adminChallenges.id, challengeId));
+  const row = challengesById.get(challengeId);
+  if (row) {
+    row.used = true;
+  }
 }
 
 export async function listAuthUsers(): Promise<SafeUserView[]> {
   await ensureAuthReady();
-  const rows = await db
-    .select()
-    .from(authUsers)
-    .orderBy(desc(authUsers.createdAt));
-  return rows.map((row) => toSafeUser(mapAuthUserRow(row)));
+  return Array.from(usersById.values())
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map(toSafeUser);
 }
 
-export async function listAuthAuditLogs(limitCount = 100) {
+export async function listAuthAuditLogs(limitCount = 100): Promise<AuditLogRow[]> {
   await ensureAuthReady();
-  return db
-    .select({
-      id: authAuditLogs.id,
-      user_id: authAuditLogs.userId,
-      email: authAuditLogs.email,
-      role: authAuditLogs.role,
-      event: authAuditLogs.event,
-      status: authAuditLogs.status,
-      ip: authAuditLogs.ip,
-      details: authAuditLogs.details,
-      created_at: authAuditLogs.createdAt
-    })
-    .from(authAuditLogs)
-    .orderBy(desc(authAuditLogs.createdAt))
-    .limit(limitCount);
+  return auditLogsStore.slice(0, limitCount);
 }
 
 export async function logAudit(entry: {
@@ -598,21 +628,20 @@ export async function logAudit(entry: {
   ip?: string;
   details?: string;
 }): Promise<void> {
-  try {
-    await ensureAuthReady();
-    await db.insert(authAuditLogs).values({
-      id: `aud-${crypto.randomUUID().slice(0, 10)}`,
-      userId: entry.userId ?? null,
-      email: entry.email ?? null,
-      role: entry.role ?? null,
-      event: entry.event,
-      status: entry.status,
-      ip: entry.ip ?? '127.0.0.1',
-      details: entry.details ?? '',
-      createdAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('Failed to persist auth audit log to Cloud SQL:', err);
+  await ensureAuthReady();
+  auditLogsStore.unshift({
+    id: `aud-${crypto.randomUUID().slice(0, 10)}`,
+    user_id: entry.userId ?? null,
+    email: entry.email ?? null,
+    role: entry.role ?? null,
+    event: entry.event,
+    status: entry.status,
+    ip: entry.ip ?? '127.0.0.1',
+    details: entry.details ?? '',
+    created_at: new Date().toISOString()
+  });
+  if (auditLogsStore.length > 500) {
+    auditLogsStore.length = 500;
   }
 }
 
@@ -630,19 +659,13 @@ export async function issueOtpChallenge(
   const otp = String(crypto.randomInt(100000, 999999));
   const otpHash = hashOtp(challengeId, otp);
 
-  // Invalidate prior unused challenges for the same user & purpose
-  await db
-    .update(adminChallenges)
-    .set({ used: true })
-    .where(
-      and(
-        eq(adminChallenges.userId, user.id),
-        eq(adminChallenges.purpose, purpose),
-        eq(adminChallenges.used, false)
-      )
-    );
+  for (const ch of challengesById.values()) {
+    if (ch.userId === user.id && ch.purpose === purpose && !ch.used) {
+      ch.used = true;
+    }
+  }
 
-  await db.insert(adminChallenges).values({
+  challengesById.set(challengeId, {
     id: challengeId,
     userId: user.id,
     purpose,
@@ -670,20 +693,8 @@ export async function verifyOtpChallengeCode(
   code: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   await ensureAuthReady();
-  const rows = await db
-    .select()
-    .from(adminChallenges)
-    .where(
-      and(
-        eq(adminChallenges.id, challengeId),
-        eq(adminChallenges.userId, userId),
-        eq(adminChallenges.purpose, purpose)
-      )
-    )
-    .limit(1);
-
-  const row = rows[0];
-  if (!row || row.used) {
+  const row = challengesById.get(challengeId);
+  if (!row || row.userId !== userId || row.purpose !== purpose || row.used) {
     return { ok: false, message: 'Verification challenge is invalid or has already been used.' };
   }
   if (row.expiresAt <= Date.now()) {
@@ -701,10 +712,7 @@ export async function verifyOtpChallengeCode(
     crypto.timingSafeEqual(Buffer.from(candidateHash), Buffer.from(row.otpHash));
 
   if (!valid) {
-    await db
-      .update(adminChallenges)
-      .set({ attempts: sql`${adminChallenges.attempts} + 1` })
-      .where(eq(adminChallenges.id, challengeId));
+    row.attempts += 1;
     return { ok: false, message: 'Invalid 6-digit verification code.' };
   }
 
@@ -721,7 +729,7 @@ export async function createSession(
   const expiresAt = Date.now() + SESSION_TTL_SECONDS * 1000;
   const nowIso = new Date().toISOString();
 
-  await db.insert(authSessions).values({
+  sessionsById.set(jti, {
     id: jti,
     userId: user.id,
     role: user.role,
@@ -731,10 +739,9 @@ export async function createSession(
     userAgent: userAgent.slice(0, 200)
   });
 
-  await db
-    .update(authUsers)
-    .set({ lastLogin: nowIso, failedAttempts: 0, lockedUntil: null })
-    .where(eq(authUsers.id, user.id));
+  user.lastLogin = nowIso;
+  user.failedAttempts = 0;
+  user.lockedUntil = null;
 
   const token = signJwt({
     sub: user.id,
@@ -751,31 +758,26 @@ export async function createSession(
 
 export async function isSessionActive(jti: string, userId: string): Promise<boolean> {
   await ensureAuthReady();
-  const rows = await db
-    .select({ revoked: authSessions.revoked, expiresAt: authSessions.expiresAt })
-    .from(authSessions)
-    .where(and(eq(authSessions.id, jti), eq(authSessions.userId, userId)))
-    .limit(1);
-
-  const row = rows[0];
-  if (!row || row.revoked) return false;
+  const row = sessionsById.get(jti);
+  if (!row || row.userId !== userId || row.revoked) return false;
   return row.expiresAt > Date.now();
 }
 
 export async function revokeSession(jti: string): Promise<void> {
   await ensureAuthReady();
-  await db
-    .update(authSessions)
-    .set({ revoked: true })
-    .where(eq(authSessions.id, jti));
+  const row = sessionsById.get(jti);
+  if (row) {
+    row.revoked = true;
+  }
 }
 
 export async function revokeAllUserSessions(userId: string): Promise<void> {
   await ensureAuthReady();
-  await db
-    .update(authSessions)
-    .set({ revoked: true })
-    .where(eq(authSessions.userId, userId));
+  for (const row of sessionsById.values()) {
+    if (row.userId === userId) {
+      row.revoked = true;
+    }
+  }
 }
 
 export async function recordFailedAdminAttempt(
@@ -783,18 +785,11 @@ export async function recordFailedAdminAttempt(
 ): Promise<{ locked: boolean; remaining: number }> {
   await ensureAuthReady();
   const nextAttempts = user.failedAttempts + 1;
+  user.failedAttempts = nextAttempts;
   if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
-    const lockedUntil = Date.now() + LOCKOUT_MS;
-    await db
-      .update(authUsers)
-      .set({ failedAttempts: nextAttempts, lockedUntil })
-      .where(eq(authUsers.id, user.id));
+    user.lockedUntil = Date.now() + LOCKOUT_MS;
     return { locked: true, remaining: 0 };
   }
-  await db
-    .update(authUsers)
-    .set({ failedAttempts: nextAttempts })
-    .where(eq(authUsers.id, user.id));
   return { locked: false, remaining: MAX_FAILED_ATTEMPTS - nextAttempts };
 }
 
@@ -820,19 +815,10 @@ export async function createAdminUserInDb(input: {
     return { ok: false, error: strengthErr };
   }
 
-  const dup = await db
-    .select({ id: authUsers.id })
-    .from(authUsers)
-    .where(
-      or(
-        sql`lower(${authUsers.email}) = ${cleanEmail}`,
-        sql`lower(${authUsers.username}) = ${cleanUsername}`
-      )
-    )
-    .limit(1);
-
-  if (dup.length > 0) {
-    return { ok: false, error: 'An account with this email or username already exists.' };
+  for (const u of usersById.values()) {
+    if (u.email.toLowerCase() === cleanEmail || u.username.toLowerCase() === cleanUsername) {
+      return { ok: false, error: 'An account with this email or username already exists.' };
+    }
   }
 
   const totpSecret = generateBase32Secret();
@@ -840,30 +826,28 @@ export async function createAdminUserInDb(input: {
   const now = new Date().toISOString();
   const isSuper = Boolean(input.isSuperAdmin);
 
-  const inserted = await db
-    .insert(authUsers)
-    .values({
-      id,
-      name: cleanName,
-      username: cleanUsername,
-      email: cleanEmail,
-      passwordHash: hashPassword(input.password),
-      role: RbacRole.ADMIN,
-      isSuperAdmin: isSuper,
-      status: 'Active',
-      totpEnabled: true,
-      totpSecret,
-      failedAttempts: 0,
-      lockedUntil: null,
-      lastLogin: null,
-      createdAt: now,
-      createdBy: input.createdBy || 'admin'
-    })
-    .returning();
+  const created: AuthUserRecord = {
+    id,
+    name: cleanName,
+    username: cleanUsername,
+    email: cleanEmail,
+    passwordHash: hashPassword(input.password),
+    role: RbacRole.ADMIN,
+    isSuperAdmin: isSuper,
+    status: 'Active',
+    totpEnabled: true,
+    totpSecret,
+    failedAttempts: 0,
+    lockedUntil: null,
+    lastLogin: null,
+    createdAt: now,
+    createdBy: input.createdBy || 'admin'
+  };
+  usersById.set(id, created);
 
   return {
     ok: true,
-    user: toSafeUser(mapAuthUserRow(inserted[0])),
+    user: toSafeUser(created),
     totpSecret,
     totpUri: buildTotpUri(cleanEmail, totpSecret)
   };

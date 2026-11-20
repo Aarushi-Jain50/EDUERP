@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { PageHeader } from '../../../components/shared/page-header';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
@@ -23,8 +25,7 @@ interface UserSessionItem {
 
 @Component({
   selector: 'app-faculty-my-profile',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, MatIconModule, PageHeader, ConfirmDialog],
+  imports: [ReactiveFormsModule, MatIconModule, PageHeader, ConfirmDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-6 font-sans text-slate-800 pb-20">
@@ -281,19 +282,25 @@ interface UserSessionItem {
         title="Terminate Active Session"
         message="Are you sure you want to invalidate this device session? The user will be logged out on that device."
         confirmLabel="Terminate Session"
-        (closed)="isConfirmOpen.set(false)"
+        (cancelled)="isConfirmOpen.set(false)"
         (confirmed)="terminateSession()"
       />
     </div>
   `
 })
 export class FacultyMyProfilePage {
+  private readonly route = inject(ActivatedRoute);
   private readonly userService = inject(CurrentUserService);
   private readonly facultyService = inject(FacultyService);
   private readonly academicService = inject(AcademicService);
   private readonly settingsService = inject(SettingsService);
   private readonly auditService = inject(AuditService);
   private readonly studentsService = inject(StudentsService);
+
+  private readonly routeTab = toSignal(
+    this.route.queryParamMap.pipe(map(params => params.get('tab'))),
+    { initialValue: null }
+  );
 
   protected readonly activeTab = signal<'personal' | 'professional' | 'password' | 'sessions'>('personal');
   protected readonly passError = signal<string>('');
@@ -302,6 +309,15 @@ export class FacultyMyProfilePage {
 
   protected readonly currentFaculty = this.userService.currentFaculty;
   protected readonly securityPolicy = this.settingsService.security;
+
+  constructor() {
+    effect(() => {
+      const t = this.routeTab();
+      if (t === 'personal' || t === 'professional' || t === 'password' || t === 'sessions') {
+        this.activeTab.set(t);
+      }
+    });
+  }
 
   protected readonly myAllocations = computed(() => {
     const fac = this.currentFaculty();

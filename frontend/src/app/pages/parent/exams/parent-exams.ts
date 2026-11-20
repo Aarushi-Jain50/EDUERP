@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { PageHeader } from '../../../components/shared/page-header';
 import { StatStrip, StatItem } from '../../../components/shared/stat-strip';
 import { EmptyState } from '../../../components/shared/empty-state';
+import { exportToPdf } from '../../../utils/export.helper';
 import { ParentPortalFacade } from '../shared/parent-portal.facade';
 
 @Component({
@@ -14,7 +15,10 @@ import { ParentPortalFacade } from '../shared/parent-portal.facade';
     <div class="space-y-5 font-sans text-[#172554] text-[13px] pb-8 min-w-0">
       <app-page-header
         title="Examinations"
-        [subtitle]="child() ? 'Examination date sheet and published result links for ' + child()!.name + ' (' + child()!.course + ' · ' + child()!.semester + ').' : 'Select a linked child to inspect exams.'"
+        [subtitle]="child() ? 'Examination date sheet, hall ticket download, and published result links for ' + child()!.name + ' (' + child()!.course + ' · ' + child()!.semester + ').' : 'Select a linked child to inspect exams.'"
+        [actionLabel]="child() ? 'Download Admit Card' : ''"
+        actionIcon="badge"
+        (actionClicked)="downloadAdmitCardPdf()"
       />
 
       @if (child()) {
@@ -178,4 +182,34 @@ export class ParentExams {
       }
     ];
   });
+
+  protected downloadAdmitCardPdf(): void {
+    const c = this.child();
+    if (!c) return;
+    const upcoming = this.examGroups().upcoming;
+    const overallAtt = this.facade.selectedOverallAttendance();
+    const eligible = !overallAtt.isBelowThreshold;
+
+    const columns = ['Code', 'Subject', 'Type', 'Mode', 'Date & Time', 'Duration', 'Venue / Hall & Seat'];
+    const rows = upcoming.map(u => [
+      u.subjectCode,
+      u.exam.subjectName,
+      u.exam.type,
+      u.exam.mode,
+      `${this.facade.formatShortDate(u.exam.date)} ${u.exam.time}`,
+      `${u.exam.duration} mins`,
+      `${u.exam.venue || 'Online Proctored'}${u.exam.seatNo ? ` (${u.exam.seatNo})` : ''}`
+    ]);
+
+    exportToPdf(
+      'Official Examination Admit Card / Hall Ticket',
+      columns,
+      rows.length > 0 ? rows : [['-', 'No upcoming scheduled papers', '-', '-', '-', '-', '-']],
+      `${c.enrollmentNo}-admit-card`,
+      [
+        `Candidate: ${c.name} (${c.enrollmentNo}) | ${c.course} · ${c.semester} · Section ${c.section}`,
+        `Hall Ticket Serial: HT-${c.enrollmentNo} | Attendance: ${overallAtt.percentage}% (${eligible ? 'Eligible' : 'Condonation Required'})`
+      ]
+    );
+  }
 }
