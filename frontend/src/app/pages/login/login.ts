@@ -99,7 +99,13 @@ interface RoleWorkspaceConfig {
             <span class="whitespace-nowrap shrink-0">{{ institute().email }}</span>
           </nav>
 
-          <div class="flex items-center gap-3 shrink-0">
+          <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+            <a
+              routerLink="/admin/dashboard"
+              class="px-3 sm:px-4 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 text-xs font-semibold text-white transition-colors whitespace-nowrap shrink-0"
+            >
+              Admin Portal
+            </a>
             <a
               routerLink="/register"
               class="px-3 sm:px-4 py-2 rounded-xl border border-slate-200/90 bg-white hover:border-indigo-600 hover:text-indigo-600 text-xs font-semibold text-slate-900 transition-colors whitespace-nowrap shrink-0"

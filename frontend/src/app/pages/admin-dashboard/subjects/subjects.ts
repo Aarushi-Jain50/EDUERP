@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AcademicService, SubjectRecord } from '../../../services/academic.service';
 import { PageHeader } from '../../../components/shared/page-header';
 import { StatStrip, StatItem } from '../../../components/shared/stat-strip';
@@ -7,12 +7,18 @@ import { DataToolbar, FilterOption } from '../../../components/shared/data-toolb
 import { DataTable, TableColumn } from '../../../components/shared/data-table';
 import { FormDrawer } from '../../../components/shared/form-drawer';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
+import { exportToExcel, exportToPdf } from '../../../utils/export.helper';
+
+export interface SubjectRow extends SubjectRecord {
+  creditsDisplay: string;
+  hoursDisplay: string;
+}
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-subjects-page',
   imports: [
-    FormsModule,
+    ReactiveFormsModule,
     PageHeader,
     StatStrip,
     DataToolbar,
@@ -22,22 +28,56 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
   ],
   template: `
     <div class="flex flex-col gap-5 max-w-[1400px] mx-auto w-full font-sans">
-      
-      <!-- 1. Page Header -->
-      <app-page-header
-        title="Subjects"
-        subtitle="Manage course syllabi, curriculum codes, credit units, and classification types."
-        actionLabel="Add Subject"
-        (actionClicked)="openAddDrawer()"
-      />
 
-      <!-- 2. Stat Strip -->
+      @if (bannerMessage(); as banner) {
+        <div
+          class="p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between gap-3"
+          [class]="banner.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'"
+        >
+          <div class="flex items-center gap-2">
+            <span class="material-icons text-base">{{ banner.type === 'error' ? 'error_outline' : 'check_circle' }}</span>
+            <span>{{ banner.text }}</span>
+          </div>
+          <button type="button" (click)="bannerMessage.set(null)" class="text-slate-500 hover:text-slate-800 cursor-pointer">
+            <span class="material-icons text-sm">close</span>
+          </button>
+        </div>
+      }
+
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <app-page-header
+          class="flex-1"
+          title="Subjects"
+          subtitle="Manage course syllabi, curriculum codes, credit units, weekly lecture/lab hours, and prerequisites."
+          actionLabel="Add Subject"
+          actionIcon="library_books"
+          (actionClicked)="openAddDrawer()"
+        />
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            (click)="exportExcel()"
+            class="h-10 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <span class="material-icons text-sm text-emerald-600">table_view</span>
+            <span>Excel</span>
+          </button>
+          <button
+            type="button"
+            (click)="exportPdf()"
+            class="h-10 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <span class="material-icons text-sm text-rose-600">picture_as_pdf</span>
+            <span>PDF</span>
+          </button>
+        </div>
+      </div>
+
       <app-stat-strip [items]="statItems()" />
 
-      <!-- 3. Data Toolbar (Search + Course Filter + Semester Filter + Type Filter) -->
       <app-data-toolbar
         [searchValue]="searchQuery()"
-        searchPlaceholder="Search by subject name or code..."
+        searchPlaceholder="Search by subject name, code, or prerequisite..."
         [filter1Value]="selectedCourse()"
         [filter1Options]="courseFilterOptions()"
         [filter2Value]="selectedType()"
@@ -49,7 +89,6 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
         (resetClicked)="resetFilters()"
       />
 
-      <!-- 4. Data Table Card -->
       <app-data-table
         [columns]="tableColumns"
         [data]="filteredSubjects()"
@@ -64,7 +103,6 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
         (deleteClicked)="onDeleteRecord($event)"
       />
 
-      <!-- Slide-in Form Drawer -->
       <app-form-drawer
         [isOpen]="isDrawerOpen()"
         [title]="drawerTitle()"
@@ -73,7 +111,7 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
         (closed)="closeDrawer()"
         (saved)="handleDrawerSave()"
       >
-        <div class="space-y-4">
+        <form [formGroup]="subjectForm" class="space-y-4">
           @if (formError()) {
             <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
               <span class="material-icons text-base text-red-600 shrink-0">error_outline</span>
@@ -81,7 +119,6 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
             </div>
           }
 
-          <!-- Subject Code -->
           <div class="space-y-1.5">
             <label for="sub-code-input" class="block text-xs font-semibold text-slate-800">
               Subject Code <span class="text-red-500">*</span>
@@ -89,14 +126,12 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
             <input
               id="sub-code-input"
               type="text"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formCode"
+              formControlName="code"
               placeholder="e.g. MCA-201"
               class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 uppercase focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
-          <!-- Subject Name -->
           <div class="space-y-1.5">
             <label for="sub-name-input" class="block text-xs font-semibold text-slate-800">
               Subject Name <span class="text-red-500">*</span>
@@ -104,22 +139,19 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
             <input
               id="sub-name-input"
               type="text"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formName"
+              formControlName="name"
               placeholder="e.g. Advanced Data Structures"
               class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
-          <!-- Course Dropdown -->
           <div class="space-y-1.5">
             <label for="sub-course-select" class="block text-xs font-semibold text-slate-800">
               Course / Program <span class="text-red-500">*</span>
             </label>
             <select
               id="sub-course-select"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formCourse"
+              formControlName="course"
               class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
             >
               @for (c of courseList(); track c.id) {
@@ -128,27 +160,23 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
             </select>
           </div>
 
-          <!-- Semester -->
           <div class="space-y-1.5">
             <label for="sub-semester-input" class="block text-xs font-semibold text-slate-800">Semester</label>
             <input
               id="sub-semester-input"
               type="text"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formSemester"
+              formControlName="semester"
               placeholder="e.g. Semester 2"
               class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
-          <!-- Type & Credits Row -->
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1.5">
               <label for="sub-type-select" class="block text-xs font-semibold text-slate-800">Subject Type</label>
               <select
                 id="sub-type-select"
-                [disabled]="isViewOnly()"
-                [(ngModel)]="formType"
+                formControlName="type"
                 class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
               >
                 <option value="Theory">Theory</option>
@@ -163,30 +191,62 @@ import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
                 type="number"
                 min="1"
                 max="8"
-                [disabled]="isViewOnly()"
-                [(ngModel)]="formCredits"
+                formControlName="credits"
                 class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
           </div>
 
-          <!-- Status -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label for="sub-lecture-hours" class="block text-xs font-semibold text-slate-800">Lecture Hours / Wk</label>
+              <input
+                id="sub-lecture-hours"
+                type="number"
+                min="0"
+                max="10"
+                formControlName="lectureHours"
+                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </div>
+            <div class="space-y-1.5">
+              <label for="sub-practical-hours" class="block text-xs font-semibold text-slate-800">Practical Hours / Wk</label>
+              <input
+                id="sub-practical-hours"
+                type="number"
+                min="0"
+                max="10"
+                formControlName="practicalHours"
+                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="sub-prereq-input" class="block text-xs font-semibold text-slate-800">Prerequisite Subject(s)</label>
+            <input
+              id="sub-prereq-input"
+              type="text"
+              formControlName="prerequisites"
+              placeholder="e.g. MCA-101 Data Structures"
+              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+
           <div class="space-y-1.5">
             <label for="sub-status-select" class="block text-xs font-semibold text-slate-800">Status</label>
             <select
               id="sub-status-select"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formStatus"
+              formControlName="status"
               class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
             >
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
           </div>
-        </div>
+        </form>
       </app-form-drawer>
 
-      <!-- Delete Confirmation Dialog -->
       <app-confirm-dialog
         [isOpen]="isDeleteDialogOpen()"
         title="Delete Subject"
@@ -205,16 +265,15 @@ export class SubjectsPage {
   protected readonly searchQuery = signal<string>('');
   protected readonly selectedCourse = signal<string>('All');
   protected readonly selectedType = signal<string>('All');
+  protected readonly bannerMessage = signal<{ type: 'success' | 'error'; text: string } | null>(null);
 
   protected readonly courseList = computed(() => this.academicService.courses());
   protected readonly subjectsList = computed(() => this.academicService.subjects());
 
-  protected readonly courseFilterOptions = computed<FilterOption[]>(() => {
-    return [
-      { label: 'Course: All', value: 'All' },
-      ...this.courseList().map(c => ({ label: c.name, value: c.name }))
-    ];
-  });
+  protected readonly courseFilterOptions = computed<FilterOption[]>(() => [
+    { label: 'Course: All', value: 'All' },
+    ...this.courseList().map(c => ({ label: c.name, value: c.name }))
+  ]);
 
   protected readonly typeFilterOptions: FilterOption[] = [
     { label: 'Type: All', value: 'All' },
@@ -229,6 +288,7 @@ export class SubjectsPage {
     { key: 'course', header: 'Course Program' },
     { key: 'semester', header: 'Semester' },
     { key: 'type', header: 'Type' },
+    { key: 'hoursDisplay', header: 'L-P Hrs', align: 'center' },
     { key: 'creditsDisplay', header: 'Credits', align: 'center' },
     { key: 'status', header: 'Status', isBadge: true }
   ];
@@ -265,7 +325,7 @@ export class SubjectsPage {
     ];
   });
 
-  protected readonly filteredSubjects = computed(() => {
+  protected readonly filteredSubjects = computed<SubjectRow[]>(() => {
     const q = this.searchQuery().trim().toLowerCase();
     const c = this.selectedCourse();
     const t = this.selectedType();
@@ -274,15 +334,20 @@ export class SubjectsPage {
         if (c !== 'All' && s.course !== c) return false;
         if (t !== 'All' && s.type !== t) return false;
         if (q) {
-          const match = `${s.code} ${s.name} ${s.course}`.toLowerCase();
+          const match = `${s.code} ${s.name} ${s.course} ${s.prerequisites || ''}`.toLowerCase();
           if (!match.includes(q)) return false;
         }
         return true;
       })
-      .map(s => ({
-        ...s,
-        creditsDisplay: `${s.credits} Credits`
-      }));
+      .map(s => {
+        const l = s.lectureHours ?? (s.type === 'Practical' ? 0 : 3);
+        const p = s.practicalHours ?? (s.type === 'Practical' ? 4 : 0);
+        return {
+          ...s,
+          creditsDisplay: `${s.credits} Cr`,
+          hoursDisplay: `${l}L - ${p}P`
+        };
+      });
   });
 
   protected readonly hasActiveFilters = computed(() => {
@@ -294,20 +359,24 @@ export class SubjectsPage {
   protected readonly editingId = signal<string | null>(null);
   protected readonly formError = signal<string>('');
 
-  protected formCode = '';
-  protected formName = '';
-  protected formCourse = '';
-  protected formSemester = 'Semester 2';
-  protected formType: 'Theory' | 'Practical' | 'Elective' = 'Theory';
-  protected formCredits = 4;
-  protected formStatus: 'Active' | 'Inactive' = 'Active';
+  protected readonly subjectForm = new FormGroup({
+    code: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    course: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    semester: new FormControl('Semester 2', { nonNullable: true }),
+    type: new FormControl<'Theory' | 'Practical' | 'Elective'>('Theory', { nonNullable: true }),
+    credits: new FormControl<number>(4, { nonNullable: true }),
+    lectureHours: new FormControl<number>(3, { nonNullable: true }),
+    practicalHours: new FormControl<number>(0, { nonNullable: true }),
+    prerequisites: new FormControl('', { nonNullable: true }),
+    status: new FormControl<'Active' | 'Inactive'>('Active', { nonNullable: true })
+  });
 
   protected readonly isDeleteDialogOpen = signal<boolean>(false);
   protected readonly deletingItem = signal<SubjectRecord | null>(null);
   protected readonly deleteDialogMessage = computed(() => {
     const item = this.deletingItem();
-    if (!item) return '';
-    return `Are you sure you want to delete ${item.name} (${item.code})?`;
+    return item ? `Are you sure you want to delete ${item.name} (${item.code})?` : '';
   });
 
   protected readonly drawerTitle = computed(() => {
@@ -316,8 +385,8 @@ export class SubjectsPage {
   });
 
   protected readonly drawerSubtitle = computed(() => {
-    if (this.isViewOnly()) return 'View curriculum syllabus and credits.';
-    return 'Enter subject code, name, and classification.';
+    if (this.isViewOnly()) return 'View curriculum syllabus, L-P hours, prerequisites, and credits.';
+    return 'Enter subject code, name, weekly hours, and classification.';
   });
 
   protected onSearchChange(val: string): void { this.searchQuery.set(val); }
@@ -329,49 +398,72 @@ export class SubjectsPage {
     this.selectedType.set('All');
   }
 
+  private syncFormDisabledState(disabled: boolean): void {
+    if (disabled) this.subjectForm.disable({ emitEvent: false });
+    else this.subjectForm.enable({ emitEvent: false });
+  }
+
   protected openAddDrawer(): void {
     this.isViewOnly.set(false);
     this.editingId.set(null);
     this.formError.set('');
-    this.formCode = '';
-    this.formName = '';
-    this.formCourse = this.courseList()[0]?.name || '';
-    this.formSemester = 'Semester 2';
-    this.formType = 'Theory';
-    this.formCredits = 4;
-    this.formStatus = 'Active';
+    this.syncFormDisabledState(false);
+    this.subjectForm.reset({
+      code: '',
+      name: '',
+      course: this.courseList()[0]?.name || '',
+      semester: 'Semester 2',
+      type: 'Theory',
+      credits: 4,
+      lectureHours: 4,
+      practicalHours: 0,
+      prerequisites: '',
+      status: 'Active'
+    });
     this.isDrawerOpen.set(true);
   }
 
-  protected onViewRecord(item: SubjectRecord): void {
+  protected onViewRecord(item: SubjectRow): void {
     this.isViewOnly.set(true);
     this.editingId.set(item.id);
     this.formError.set('');
-    this.formCode = item.code;
-    this.formName = item.name;
-    this.formCourse = item.course;
-    this.formSemester = item.semester;
-    this.formType = item.type;
-    this.formCredits = item.credits;
-    this.formStatus = item.status;
+    this.subjectForm.reset({
+      code: item.code,
+      name: item.name,
+      course: item.course,
+      semester: item.semester,
+      type: item.type,
+      credits: item.credits,
+      lectureHours: item.lectureHours ?? 3,
+      practicalHours: item.practicalHours ?? 0,
+      prerequisites: item.prerequisites || '',
+      status: item.status
+    });
+    this.syncFormDisabledState(true);
     this.isDrawerOpen.set(true);
   }
 
-  protected onEditRecord(item: SubjectRecord): void {
+  protected onEditRecord(item: SubjectRow): void {
     this.isViewOnly.set(false);
     this.editingId.set(item.id);
     this.formError.set('');
-    this.formCode = item.code;
-    this.formName = item.name;
-    this.formCourse = item.course;
-    this.formSemester = item.semester;
-    this.formType = item.type;
-    this.formCredits = item.credits;
-    this.formStatus = item.status;
+    this.syncFormDisabledState(false);
+    this.subjectForm.reset({
+      code: item.code,
+      name: item.name,
+      course: item.course,
+      semester: item.semester,
+      type: item.type,
+      credits: item.credits,
+      lectureHours: item.lectureHours ?? 3,
+      practicalHours: item.practicalHours ?? 0,
+      prerequisites: item.prerequisites || '',
+      status: item.status
+    });
     this.isDrawerOpen.set(true);
   }
 
-  protected onDeleteRecord(item: SubjectRecord): void {
+  protected onDeleteRecord(item: SubjectRow): void {
     this.deletingItem.set(item);
     this.isDeleteDialogOpen.set(true);
   }
@@ -386,20 +478,24 @@ export class SubjectsPage {
       this.closeDrawer();
       return;
     }
-    if (!this.formCode.trim() || !this.formName.trim() || !this.formCourse) {
+    const val = this.subjectForm.getRawValue();
+    if (!val.code.trim() || !val.name.trim() || !val.course) {
       this.formError.set('Subject code, name, and course are required.');
       return;
     }
 
     const res = this.academicService.saveSubject(
       {
-        code: this.formCode.trim().toUpperCase(),
-        name: this.formName.trim(),
-        course: this.formCourse,
-        semester: this.formSemester,
-        type: this.formType,
-        credits: Number(this.formCredits) || 4,
-        status: this.formStatus
+        code: val.code.trim().toUpperCase(),
+        name: val.name.trim(),
+        course: val.course,
+        semester: val.semester.trim(),
+        type: val.type,
+        credits: Number(val.credits) || 4,
+        lectureHours: Number(val.lectureHours) || 0,
+        practicalHours: Number(val.practicalHours) || 0,
+        prerequisites: val.prerequisites.trim() || undefined,
+        status: val.status
       },
       this.editingId() || undefined
     );
@@ -408,6 +504,7 @@ export class SubjectsPage {
       this.formError.set(res.error || 'Failed to save subject.');
       return;
     }
+    this.bannerMessage.set({ type: 'success', text: `Subject ${val.code.trim().toUpperCase()} saved.` });
     this.closeDrawer();
   }
 
@@ -415,7 +512,43 @@ export class SubjectsPage {
     const item = this.deletingItem();
     if (item) {
       this.academicService.deleteSubject(item.id);
+      this.bannerMessage.set({ type: 'success', text: `Subject ${item.code} deleted.` });
     }
     this.isDeleteDialogOpen.set(false);
+  }
+
+  protected exportExcel(): void {
+    exportToExcel(
+      this.filteredSubjects().map(s => ({
+        Code: s.code,
+        'Subject Name': s.name,
+        Course: s.course,
+        Semester: s.semester,
+        Type: s.type,
+        'L-P Hours': s.hoursDisplay,
+        Credits: s.credits,
+        Prerequisites: s.prerequisites || 'None',
+        Status: s.status
+      })),
+      'EduERP_Subjects_Curriculum'
+    );
+  }
+
+  protected exportPdf(): void {
+    exportToPdf(
+      'Curriculum Subjects & Credit Catalog',
+      ['Code', 'Subject Name', 'Course Program', 'Semester', 'Type', 'L-P Hrs', 'Credits', 'Status'],
+      this.filteredSubjects().map(s => [
+        s.code,
+        s.name,
+        s.course,
+        s.semester,
+        s.type,
+        s.hoursDisplay,
+        s.creditsDisplay,
+        s.status
+      ]),
+      'EduERP_Subjects_Curriculum'
+    );
   }
 }

@@ -524,6 +524,83 @@ export class StudentFirebaseService {
     this.studentsService.showToast('info', 'Pending leave request withdrawn.');
   }
 
+  async reviewLeaveRequest(requestId: string, decision: 'Approved' | 'Rejected'): Promise<void> {
+    const target = this._leaveRequests().find(r => r.id === requestId);
+    if (!target) return;
+
+    const updatedAt = new Date().toISOString();
+    this._leaveRequests.update(list => {
+      const next = list.map(r => (r.id === requestId ? { ...r, status: decision as LeaveStatus, updatedAt } : r));
+      this.saveLocalLeaves(next);
+      return next;
+    });
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      try {
+        await updateDoc(doc(db, 'leaveRequests', requestId), {
+          status: decision,
+          updatedAt,
+        });
+      } catch {
+        // local state kept in open-auth preview
+      }
+    }
+
+    this.studentsService.showToast(
+      decision === 'Approved' ? 'success' : 'info',
+      `Leave request for ${target.studentName} marked ${decision}.`
+    );
+  }
+
+  async adminUpdateSupportTicket(
+    ticketId: string,
+    status: TicketStatus,
+    replyMessage?: string,
+    responderName = 'Admin Helpdesk'
+  ): Promise<void> {
+    const target = this._supportTickets().find(t => t.id === ticketId);
+    if (!target) return;
+
+    const nowIso = new Date().toISOString();
+    const cleanReply = replyMessage?.trim().slice(0, 1000);
+    const nextReplies = cleanReply
+      ? [
+          ...target.replies,
+          {
+            id: `rep-${Date.now()}`,
+            sender: responderName,
+            senderRole: 'admin' as const,
+            message: cleanReply,
+            timestamp: nowIso,
+          },
+        ].slice(0, 50)
+      : target.replies;
+
+    this._supportTickets.update(list => {
+      const next = list.map(t =>
+        t.id === ticketId ? { ...t, status, replies: nextReplies, updatedAt: nowIso } : t
+      );
+      this.saveLocalTickets(next);
+      return next;
+    });
+
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      try {
+        await updateDoc(doc(db, 'supportTickets', ticketId), {
+          status,
+          replies: nextReplies,
+          updatedAt: nowIso,
+        });
+      } catch {
+        // local state kept in open-auth preview
+      }
+    }
+
+    this.studentsService.showToast('success', `Ticket ${target.ticketNo} updated (${status}).`);
+  }
+
   async createSupportTicket(payload: {
     category: TicketCategory;
     priority: TicketPriority;

@@ -1,32 +1,44 @@
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { BaseChartDirective } from 'ng2-charts';
+import { ChartConfiguration, ChartData } from 'chart.js';
 import { PageHeader } from '../../../components/shared/page-header';
 import { ReportFilterBar, ReportFilters } from '../../../components/reports/report-filter-bar';
 import { KpiCard } from '../../../components/reports/kpi-card';
 import { ChartCard } from '../../../components/reports/chart-card';
 import { FinanceService } from '../../../services/finance.service';
 import { AcademicService } from '../../../services/academic.service';
-import { BaseChartDirective } from 'ng2-charts';
-import { ChartConfiguration, ChartData } from 'chart.js';
+import { StudentsService } from '../../../services/students.service';
 import { formatCurrency } from '../../../utils/money.helper';
-import { exportToExcel } from '../../../utils/export.helper';
+import { exportToExcel, exportToPdf } from '../../../utils/export.helper';
 
 @Component({
   selector: 'app-fee-reports',
-  standalone: true,
-  imports: [CommonModule, PageHeader, ReportFilterBar, KpiCard, ChartCard, BaseChartDirective],
+  imports: [CommonModule, MatIconModule, PageHeader, ReportFilterBar, KpiCard, ChartCard, BaseChartDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-6 max-w-[1400px] mx-auto w-full font-sans animate-in fade-in duration-500">
-      <app-page-header 
-        title="Fee & Financial Reports" 
+      <app-page-header
+        title="Fee & Financial Reports"
         subtitle="Institutional revenue tracking, outstanding dues analysis, and collection efficiency metrics."
-        primaryActionLabel="Export Analysis"
-        primaryActionIcon="description"
-        (primaryActionClicked)="exportExcel()"
+        actionLabel="Export Excel"
+        actionIcon="table_view"
+        (actionClicked)="exportExcel()"
       />
 
-      <app-report-filter-bar (filterChange)="onFilterChange($event)" />
+      <div class="flex justify-end -mt-2">
+        <button
+          type="button"
+          (click)="exportPdf()"
+          class="h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
+        >
+          <mat-icon class="!text-sm !w-4 !h-4 text-rose-600">picture_as_pdf</mat-icon>
+          Export PDF
+        </button>
+      </div>
+
+      <app-report-filter-bar [showDateRange]="true" (filterChange)="onFilterChange($event)" />
 
       <!-- KPI Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -38,11 +50,11 @@ import { exportToExcel } from '../../../utils/export.helper';
 
       <!-- Charts Row -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <app-chart-card title="Monthly Collection Trend" subtitle="Revenue trajectory for the current academic session">
-          <canvas baseChart [data]="trendData" [options]="barChartOptions" [type]="'bar'"></canvas>
+        <app-chart-card title="Monthly Collection Trend" subtitle="Settled receipt revenue aggregated by month (₹)" [isEmpty]="trendData().labels?.length === 0">
+          <canvas baseChart [data]="trendData()" [options]="barChartOptions" [type]="'bar'"></canvas>
         </app-chart-card>
 
-        <app-chart-card title="Payment Mode Distribution" subtitle="Split of digital vs traditional collections">
+        <app-chart-card title="Payment Mode Distribution" subtitle="Split of digital vs traditional collections" [isEmpty]="modeData().labels?.length === 0">
           <canvas baseChart [data]="modeData()" [options]="doughnutOptions" [type]="'doughnut'"></canvas>
         </app-chart-card>
       </div>
@@ -51,7 +63,7 @@ import { exportToExcel } from '../../../utils/export.helper';
       <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
         <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center text-slate-400">
           <h4 class="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-            <span class="material-icons text-sm">account_balance</span>
+            <mat-icon class="!text-base !w-4 !h-4 text-[#6D42E8]">account_balance</mat-icon>
             Course-wise Revenue Breakdown
           </h4>
         </div>
@@ -84,6 +96,10 @@ import { exportToExcel } from '../../../utils/export.helper';
                     </div>
                   </td>
                 </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="p-10 text-center text-slate-400 text-xs italic">No course fee metrics match the active filters.</td>
+                </tr>
               }
             </tbody>
           </table>
@@ -95,12 +111,49 @@ import { exportToExcel } from '../../../utils/export.helper';
 export class FeeReportsPage {
   private readonly financeService = inject(FinanceService);
   private readonly academicService = inject(AcademicService);
+  private readonly studentsService = inject(StudentsService);
 
-  protected filters = signal<ReportFilters>({ academicYear: '2025-26', courseId: 'All', semester: 'All' });
+  protected readonly filters = signal<ReportFilters>({
+    academicYear: 'All',
+    courseId: 'All',
+    semester: 'All'
+  });
 
-  protected stats = computed(() => {
-    const payments = this.financeService.payments().filter(p => p.status === 'Paid');
-    const ledgers = this.financeService.ledgers();
+  protected readonly filteredStudentIds = computed(() => {
+    const f = this.filters();
+    return new Set(
+      this.studentsService
+        .students()
+        .filter(s => {
+          if (f.academicYear !== 'All' && s.academicYear !== f.academicYear) return false;
+          if (f.courseId !== 'All' && s.courseId !== f.courseId) return false;
+          if (f.semester !== 'All' && s.semester !== f.semester) return false;
+          return true;
+        })
+        .map(s => s.id)
+    );
+  });
+
+  protected readonly filteredLedgers = computed(() => {
+    const ids = this.filteredStudentIds();
+    return this.financeService.ledgers().filter(l => ids.has(l.studentId));
+  });
+
+  protected readonly filteredPayments = computed(() => {
+    const f = this.filters();
+    const ids = this.filteredStudentIds();
+    return this.financeService.payments().filter(p => {
+      if (p.status !== 'Paid') return false;
+      if (!ids.has(p.studentId)) return false;
+      if (f.startDate && p.date < f.startDate) return false;
+      if (f.endDate && p.date > f.endDate) return false;
+      return true;
+    });
+  });
+
+  protected readonly stats = computed(() => {
+    const payments = this.filteredPayments();
+    const ledgers = this.filteredLedgers();
 
     const collected = payments.reduce((acc, p) => acc + p.total, 0);
     let totalDue = 0;
@@ -110,7 +163,10 @@ export class FeeReportsPage {
       const unpaid = l.installments.filter(i => i.status !== 'Paid');
       if (unpaid.length > 0) {
         defaultersCount++;
-        totalDue += unpaid.reduce((acc, i) => acc + (i.totalAmount - i.paidAmount), 0);
+        totalDue += unpaid.reduce(
+          (acc, i) => acc + Math.max(0, i.totalAmount - i.paidAmount - (i.concessionAmount || 0)),
+          0
+        );
       }
     });
 
@@ -120,23 +176,31 @@ export class FeeReportsPage {
     return { collected, outstanding: totalDue, efficiency, defaulters: defaultersCount };
   });
 
-  protected trendData: ChartData<'bar'> = {
-    labels: ['Aug', 'Sep', 'Oct', 'Nov'],
-    datasets: [
-      {
-        data: [1200000, 450000, 300000, 550000],
-        label: 'Actual Collected (₹)',
-        backgroundColor: '#6D42E8',
-        borderRadius: 8,
-        barThickness: 25
-      }
-    ]
-  };
+  protected readonly trendData = computed<ChartData<'bar'>>(() => {
+    const monthTotals: Record<string, number> = {};
+    for (const p of this.filteredPayments()) {
+      const month = (p.date || '2025-08').slice(0, 7);
+      monthTotals[month] = (monthTotals[month] || 0) + p.total;
+    }
+    const keys = Object.keys(monthTotals).sort();
 
-  protected modeData = computed<ChartData<'doughnut'>>(() => {
-    const payments = this.financeService.payments().filter(p => p.status === 'Paid');
+    return {
+      labels: keys,
+      datasets: [
+        {
+          data: keys.map(k => monthTotals[k]),
+          label: 'Actual Collected (₹)',
+          backgroundColor: '#6D42E8',
+          borderRadius: 8,
+          barThickness: 26
+        }
+      ]
+    };
+  });
+
+  protected readonly modeData = computed<ChartData<'doughnut'>>(() => {
     const modes: Record<string, number> = {};
-    payments.forEach(p => {
+    this.filteredPayments().forEach(p => {
       modes[p.mode] = (modes[p.mode] || 0) + p.total;
     });
 
@@ -150,40 +214,50 @@ export class FeeReportsPage {
     };
   });
 
-  protected tableData = computed(() => {
-    const ledgers = this.financeService.ledgers();
-    const payments = this.financeService.payments().filter(p => p.status === 'Paid');
-    const courses = this.academicService.courses();
+  protected readonly tableData = computed(() => {
+    const f = this.filters();
+    const ledgers = this.filteredLedgers();
+    const payments = this.filteredPayments();
+    const courses = this.academicService.courses().filter(c => f.courseId === 'All' || c.id === f.courseId);
 
-    return courses.map(c => {
-      const courseLedgers = ledgers.filter(l => l.courseId === c.id);
-      const coursePayments = payments.filter(p => p.courseName === c.id);
-      
-      const collected = coursePayments.reduce((acc, p) => acc + p.total, 0);
-      const outstanding = courseLedgers.reduce((acc, l) => {
-        return acc + l.installments.filter(i => i.status !== 'Paid')
-          .reduce((sum, i) => sum + (i.totalAmount - i.paidAmount), 0);
-      }, 0);
+    return courses
+      .map(c => {
+        const courseLedgers = ledgers.filter(l => l.courseId === c.id);
+        const courseStudentIds = new Set(courseLedgers.map(l => l.studentId));
+        const coursePayments = payments.filter(
+          p => courseStudentIds.has(p.studentId) || p.courseName === c.name
+        );
 
-      const defaulters = courseLedgers.filter(l => l.installments.some(i => i.status !== 'Paid')).length;
-      const target = collected + outstanding;
-      const efficiency = target > 0 ? Math.round((collected / target) * 100) : 0;
+        const collected = coursePayments.reduce((acc, p) => acc + p.total, 0);
+        const outstanding = courseLedgers.reduce((acc, l) => {
+          return (
+            acc +
+            l.installments
+              .filter(i => i.status !== 'Paid')
+              .reduce((sum, i) => sum + Math.max(0, i.totalAmount - i.paidAmount - (i.concessionAmount || 0)), 0)
+          );
+        }, 0);
 
-      return { course: c.name, target, collected, outstanding, defaulters, efficiency };
-    });
+        const defaulters = courseLedgers.filter(l => l.installments.some(i => i.status !== 'Paid')).length;
+        const target = collected + outstanding;
+        const efficiency = target > 0 ? Math.round((collected / target) * 100) : 0;
+
+        return { course: c.name, target, collected, outstanding, defaulters, efficiency };
+      })
+      .filter(row => row.target > 0 || f.courseId !== 'All');
   });
 
-  protected barChartOptions: ChartConfiguration['options'] = {
+  protected readonly barChartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-      y: { grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
+      y: { beginAtZero: true, grid: { color: '#F1F5F9' }, ticks: { font: { size: 10 } } },
       x: { grid: { display: false }, ticks: { font: { size: 10 } } }
     }
   };
 
-  protected doughnutOptions: ChartConfiguration<'doughnut'>['options'] = {
+  protected readonly doughnutOptions: ChartConfiguration<'doughnut'>['options'] = {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '70%',
@@ -192,11 +266,28 @@ export class FeeReportsPage {
     }
   };
 
-  onFilterChange(f: ReportFilters) { this.filters.set(f); }
+  onFilterChange(f: ReportFilters) {
+    this.filters.set(f);
+  }
 
   exportExcel() {
     exportToExcel(this.tableData(), 'Institutional_Fee_Revenue_Report');
   }
 
-  formatCurrency(amt: number) { return formatCurrency(amt); }
+  exportPdf() {
+    const cols = ['Course', 'Target (₹)', 'Collected (₹)', 'Outstanding (₹)', 'Defaulters', 'Recovery %'];
+    const rows = this.tableData().map(r => [
+      r.course,
+      formatCurrency(r.target),
+      formatCurrency(r.collected),
+      formatCurrency(r.outstanding),
+      r.defaulters,
+      `${r.efficiency}%`
+    ]);
+    exportToPdf('Institutional Fee Revenue Report', cols, rows, 'Institutional_Fee_Revenue_Report');
+  }
+
+  formatCurrency(amt: number) {
+    return formatCurrency(amt);
+  }
 }

@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Router } from '@angular/router';
+// import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { AuthSessionService } from '../services/auth-session.service';
 
@@ -20,7 +20,7 @@ const PUBLIC_AUTH_PATHS = [
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const platformId = inject(PLATFORM_ID);
   const authSession = inject(AuthSessionService);
-  const router = inject(Router);
+  // const router = inject(Router);
 
   let outReq = req;
   if (req.url.startsWith('/api')) {
@@ -41,9 +41,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         !PUBLIC_AUTH_PATHS.some(path => req.url.startsWith(path))
       ) {
         authSession.clearToken();
-        if (router.url.startsWith('/admin') && !router.url.startsWith('/admin/secure-login')) {
-          router.navigate(['/admin/secure-login'], { queryParams: { reason: 'session_expired' } });
-        }
+        // Temporarily commented out while Admin Portal hard authentication is disabled:
+        // if (router.url.startsWith('/admin') && !router.url.startsWith('/admin/secure-login')) {
+        //   router.navigate(['/admin/secure-login'], { queryParams: { reason: 'session_expired' } });
+        // }
       }
       return throwError(() => error);
     })

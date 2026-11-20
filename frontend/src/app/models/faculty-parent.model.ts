@@ -13,11 +13,14 @@ export interface Faculty {
   department: string;
   designation: DesignationType;
   qualification: string;
+  specialization?: string;
   experienceYears: number;
   experience: string;
   joiningDate: string;
   status: FacultyStatus;
   isHod?: boolean;
+  maxWeeklyHours?: number;
+  documentsVerified?: boolean;
 }
 
 export type ParentRelation = 'Father' | 'Mother' | 'Guardian';
@@ -34,4 +37,5 @@ export interface Parent {
   studentIds: string[];
   studentNames: string[];
   status: 'Active' | 'Inactive';
+  verified?: boolean;
 }

@@ -6,10 +6,13 @@ import { StudentsService } from './students.service';
 import { AcademicService } from './academic.service';
 import { FacultyService } from './faculty.service';
 import { NotificationService } from './notification.service';
+import { ActivityService } from './activity.service';
+import { AuditService } from './audit.service';
 import { Student } from '../models/student.model';
 import { AssignmentQuestion, getQuestionsForSubject } from '../data/assignment-questions';
 import { auth, db } from '../lib/firebase';
 import { OperationType, handleFirestoreError } from '../lib/firestore-errors';
+import { FirestoreCollectionSync } from '../lib/firestore-collection-sync';
 
 export type AssignmentStatus = 'Active' | 'Closed' | 'Overdue';
 export type SubmissionStatus = 'Draft' | 'Submitted' | 'Late' | 'Evaluated';
@@ -416,8 +419,16 @@ export class AssignmentsService {
   private readonly academicService = inject(AcademicService);
   private readonly facultyService = inject(FacultyService);
   private readonly notificationService = inject(NotificationService);
+  private readonly activityService = inject(ActivityService);
+  private readonly auditService = inject(AuditService);
 
-  private readonly _assignments = signal<Assignment[]>(this.loadStoredAssignments());
+  private readonly _assignments = signal<Assignment[]>([]);
+  private readonly assignmentsSync = new FirestoreCollectionSync<Assignment>(
+    'assignments',
+    ASSIGNMENTS_STORAGE_KEY,
+    this._assignments,
+    isPlatformBrowser(this.platformId)
+  );
   private readonly _submissions = signal<AssignmentSubmission[]>(this.loadStoredSubmissions());
 
   private readonly _evaluations = signal<Record<string, { marksObtained: number; feedback?: string }>>({
@@ -432,6 +443,17 @@ export class AssignmentsService {
   readonly evaluations = this._evaluations.asReadonly();
 
   constructor() {
+    this._assignments.set(
+      this.assignmentsSync.loadInitial(SEED_ASSIGNMENTS).map(a => ({
+        ...a,
+        taskType: a.taskType ?? 'Assignment',
+        questions:
+          a.questions && a.questions.length > 0
+            ? a.questions
+            : getQuestionsForSubject(a.subjectId, a.id),
+      }))
+    );
+    this.assignmentsSync.startSync();
     if (isPlatformBrowser(this.platformId)) {
       onAuthStateChanged(auth, user => {
         this.submissionUnsub?.();
@@ -1010,12 +1032,22 @@ export class AssignmentsService {
       questions: resolvedQuestions,
     };
 
-    this._assignments.update(list => {
-      const next = [record, ...list];
-      this.persistLocalAssignments(next);
-      return next;
-    });
+    this._assignments.update(list => [record, ...list]);
+    this.assignmentsSync.syncUpsert(record);
+
     const label = record.taskType === 'Homework' ? 'Homework' : 'Assignment';
+    this.activityService.logActivity({
+      user: 'Academic Coordinator',
+      role: 'Academic Operations',
+      module: 'Assignments',
+      category: 'Academic',
+      operationType: 'Create',
+      action: `Created ${label}`,
+      target: `${record.title} (${record.subjectName})`,
+      recordId: newId,
+      details: `Due ${record.dueDate} · Max ${record.maxMarks} marks`,
+      icon: 'assignment'
+    });
     this.studentsService.showToast('success', `${label} "${assignment.title}" created.`);
   }
 
@@ -1030,38 +1062,68 @@ export class AssignmentsService {
           }))
         : getQuestionsForSubject(assignment.subjectId, id);
 
-    this._assignments.update(list => {
-      const next = list.map(a =>
-        a.id === id
-          ? {
-              ...assignment,
-              taskType: assignment.taskType ?? a.taskType ?? 'Assignment',
-              allowLateSubmission: assignment.allowLateSubmission ?? true,
-              id,
-              questions: resolvedQuestions,
-            }
-          : a
-      );
-      this.persistLocalAssignments(next);
-      return next;
+    const updatedRecord: Assignment = {
+      ...assignment,
+      taskType: assignment.taskType ?? 'Assignment',
+      allowLateSubmission: assignment.allowLateSubmission ?? true,
+      id,
+      questions: resolvedQuestions,
+    };
+
+    this._assignments.update(list => list.map(a => (a.id === id ? updatedRecord : a)));
+    this.assignmentsSync.syncUpsert(updatedRecord);
+
+    const label = updatedRecord.taskType === 'Homework' ? 'Homework' : 'Assignment';
+    this.auditService.log({
+      userId: 'admin',
+      userName: 'Academic Coordinator',
+      role: 'Academic Operations',
+      module: 'Assignments',
+      action: 'Update',
+      target: `Updated ${updatedRecord.title}`,
+      status: 'Success'
     });
-    const label = assignment.taskType === 'Homework' ? 'Homework' : 'Assignment';
     this.studentsService.showToast('success', `${label} "${assignment.title}" updated.`);
+  }
+
+  toggleAssignmentStatus(id: string): void {
+    const existing = this._assignments().find(a => a.id === id);
+    if (!existing) return;
+    const nextStatus: AssignmentStatus = existing.status === 'Closed' ? 'Active' : 'Closed';
+    const updated: Assignment = { ...existing, status: nextStatus };
+    this._assignments.update(list => list.map(a => (a.id === id ? updated : a)));
+    this.assignmentsSync.syncUpsert(updated);
+    this.auditService.log({
+      userId: 'admin',
+      userName: 'Academic Coordinator',
+      role: 'Academic Operations',
+      module: 'Assignments',
+      action: 'Update',
+      target: `${nextStatus === 'Closed' ? 'Closed' : 'Reopened'} "${existing.title}"`,
+      status: 'Success'
+    });
+    this.studentsService.showToast('info', `"${existing.title}" marked ${nextStatus}.`);
   }
 
   delete(id: string): void {
     const a = this._assignments().find(item => item.id === id);
-    this._assignments.update(list => {
-      const next = list.filter(item => item.id !== id);
-      this.persistLocalAssignments(next);
-      return next;
-    });
+    this._assignments.update(list => list.filter(item => item.id !== id));
+    this.assignmentsSync.syncDelete(id);
     this._submissions.update(list => {
       const next = list.filter(s => s.assignmentId !== id);
       this.persistLocalSubmissions(next);
       return next;
     });
     if (a) {
+      this.auditService.log({
+        userId: 'admin',
+        userName: 'Academic Coordinator',
+        role: 'Academic Operations',
+        module: 'Assignments',
+        action: 'Delete',
+        target: `Deleted "${a.title}"`,
+        status: 'Success'
+      });
       this.studentsService.showToast('info', `${a.taskType || 'Assignment'} "${a.title}" deleted.`);
     }
   }

@@ -1,16 +1,26 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { Unsubscribe, onAuthStateChanged } from 'firebase/auth';
+import { collection, doc, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { auth, db, testFirestoreConnection } from '../lib/firebase';
+import { OperationType, handleFirestoreError } from '../lib/firestore-errors';
 
 export type ActivityCategory = 'Academic' | 'People' | 'Attendance' | 'Exams' | 'Fees' | 'Notices' | 'Security';
 export type ActivityPeriod = 'Today' | 'Yesterday' | 'Earlier';
+export type ActivityOperationType = 'Create' | 'Update' | 'Delete' | 'Approve' | 'Reject' | 'Publish' | 'Export' | 'Security';
 
 export interface ActivityItem {
   id: string;
   user: string;
   role: string;
+  operationType: ActivityOperationType;
   action: string;
   target: string;
+  recordId?: string;
   module: string;
   category: ActivityCategory;
+  timestampIso: string;
+  details?: string;
   period: ActivityPeriod;
   relativeTime: string;
   exactTime: string;
@@ -18,484 +28,542 @@ export interface ActivityItem {
   icon: string;
 }
 
+export type ActivityLogInput = Omit<
+  ActivityItem,
+  'id' | 'period' | 'relativeTime' | 'exactTime' | 'daysAgo' | 'timestampIso' | 'operationType'
+> & {
+  operationType?: ActivityOperationType;
+  timestampIso?: string;
+  period?: ActivityPeriod;
+  relativeTime?: string;
+  exactTime?: string;
+  daysAgo?: number;
+};
+
+interface SeedActivityBase {
+  id: string;
+  user: string;
+  role: string;
+  operationType: ActivityOperationType;
+  action: string;
+  target: string;
+  recordId?: string;
+  module: string;
+  category: ActivityCategory;
+  minutesOffset: number;
+  details: string;
+  icon: string;
+}
+
+const ACTIVITY_STORAGE_KEY = 'eduerp_institutional_activities_v2';
+
+const SEED_ACTIVITY_BASE: SeedActivityBase[] = [
+  {
+    id: 'act-001',
+    user: 'Admin (Dean Office)',
+    role: 'System Administrator',
+    operationType: 'Create',
+    action: 'enrolled new student',
+    target: 'Rahul Verma (MCA-2025-001) into MCA Semester 2',
+    recordId: 'MCA-2025-001',
+    module: 'Student Admissions',
+    category: 'People',
+    minutesOffset: 12,
+    details: 'Admission verification completed and enrollment ID generated with Section A allocation.',
+    icon: 'person_add'
+  },
+  {
+    id: 'act-002',
+    user: 'Prof. Meena Sharma',
+    role: 'Associate Professor',
+    operationType: 'Update',
+    action: 'marked attendance for',
+    target: 'BCA Section A (34 Present, 5 Absent, 1 Leave)',
+    recordId: 'sess-15',
+    module: 'Attendance Management',
+    category: 'Attendance',
+    minutesOffset: 35,
+    details: 'Morning lecture register locked and synced with student portal.',
+    icon: 'how_to_reg'
+  },
+  {
+    id: 'act-003',
+    user: 'Suresh Patil',
+    role: 'Accounts Officer',
+    operationType: 'Create',
+    action: 'collected semester fee of',
+    target: '₹60,000 from Rahul Verma (MCA-2025-001)',
+    recordId: 'EDU-2025-26-00001',
+    module: 'Fee Collection',
+    category: 'Fees',
+    minutesOffset: 65,
+    details: 'UPI Settlement #UPI-50284910 verified and receipt issued.',
+    icon: 'payments'
+  },
+  {
+    id: 'act-004',
+    user: 'Kavita Nair',
+    role: 'Registrar',
+    operationType: 'Publish',
+    action: 'published official notice:',
+    target: 'Even Semester Admit Card & Exam Form Verification',
+    recordId: 'n-5',
+    module: 'Notices & Announcements',
+    category: 'Notices',
+    minutesOffset: 125,
+    details: 'Broadcasted to all Students with Urgent priority and pinned on portal board.',
+    icon: 'campaign'
+  },
+  {
+    id: 'act-005',
+    user: 'Dr. R.K. Raman',
+    role: 'Controller of Examinations',
+    operationType: 'Create',
+    action: 'scheduled examination session for',
+    target: 'Internal Assessment I — Advanced Data Structures (ex-1)',
+    recordId: 'ex-1',
+    module: 'Examinations Cell',
+    category: 'Exams',
+    minutesOffset: 185,
+    details: 'Protected Online Exam Browser enabled with 60-minute timer and proctor policy.',
+    icon: 'assignment'
+  },
+  {
+    id: 'act-006',
+    user: 'Admin (Dean Office)',
+    role: 'System Administrator',
+    operationType: 'Export',
+    action: 'exported Attendance Report for',
+    target: 'MCA Semester 2 (Cumulative Monthly Sheet)',
+    recordId: 'RPT-ATT-2026-11',
+    module: 'Attendance Management',
+    category: 'Attendance',
+    minutesOffset: 245,
+    details: 'Generated printable register and Excel workbook for academic council review.',
+    icon: 'file_download'
+  },
+  {
+    id: 'act-007',
+    user: 'Dr. S. N. Roy',
+    role: 'HOD Computer Applications',
+    operationType: 'Update',
+    action: 'allocated subject workload to',
+    target: 'Dr. Amit Joshi — Advanced Data Structures & Algorithms (4 hrs/wk)',
+    recordId: 'alloc-1',
+    module: 'Subject Allocation',
+    category: 'Academic',
+    minutesOffset: 310,
+    details: 'Faculty workload check passed with zero timetable conflicts.',
+    icon: 'school'
+  },
+  {
+    id: 'act-008',
+    user: 'Dinesh Rathore',
+    role: 'Senior Accounts Officer',
+    operationType: 'Publish',
+    action: 'dispatched automated fee reminder to',
+    target: 'Students with overdue 2nd installment balances',
+    recordId: 'FEE-REM-2026-08',
+    module: 'Pending Fees',
+    category: 'Fees',
+    minutesOffset: 380,
+    details: 'SMS and portal reminder notices queued for overdue installment ledgers.',
+    icon: 'receipt_long'
+  },
+  {
+    id: 'act-009',
+    user: 'Dr. R.K. Raman',
+    role: 'Controller of Examinations',
+    operationType: 'Approve',
+    action: 'approved and published results for',
+    target: 'End-Term Theory Exam (ex-2) — 5 student scripts verified',
+    recordId: 'ex-2',
+    module: 'Results & Grades',
+    category: 'Exams',
+    minutesOffset: 430,
+    details: 'Marks published live to Student & Parent result portals.',
+    icon: 'grade'
+  },
+  {
+    id: 'act-010',
+    user: 'Vikram Chauhan',
+    role: 'Security Systems Engineer',
+    operationType: 'Security',
+    action: 'flagged failed login attempts on',
+    target: 'faculty account k.rao@eduerp.edu (IP: 103.21.124.9)',
+    recordId: 'SEC-ALERT-902',
+    module: 'Security Overview',
+    category: 'Security',
+    minutesOffset: 495,
+    details: 'Rate limiter engaged for 15 minutes after 3 consecutive invalid credential attempts.',
+    icon: 'shield'
+  },
+  {
+    id: 'act-011',
+    user: 'Dr. P. V. Ramamurthy',
+    role: 'Dean of Student Welfare',
+    operationType: 'Approve',
+    action: 'approved academic event leave for',
+    target: 'Rahul Verma (MCA-2025-001) — Inter-University Cloud Hackathon',
+    recordId: 'lr-seed-1',
+    module: 'Attendance Management',
+    category: 'Attendance',
+    minutesOffset: 1500,
+    details: 'On-duty academic leave regularized for 2026-11-04.',
+    icon: 'verified'
+  },
+  {
+    id: 'act-012',
+    user: 'Suresh Patil',
+    role: 'Accounts Officer',
+    operationType: 'Update',
+    action: 'reversed cancelled cheque receipt #CHQ-114082 for',
+    target: 'Rahul Verma (MCA-2025-001) — ₹60,000',
+    recordId: 'CHQ-114082',
+    module: 'Payment History',
+    category: 'Fees',
+    minutesOffset: 1680,
+    details: 'Incorrect installment mapped; re-issued cleanly via UPI settlement.',
+    icon: 'receipt'
+  },
+  {
+    id: 'act-013',
+    user: 'Dr. Anita Desai',
+    role: 'Dean (Academics)',
+    operationType: 'Update',
+    action: 'updated curriculum & credits for',
+    target: 'M.Tech Artificial Intelligence & Robotics (4 Semesters)',
+    recordId: 'course-mtech-ai',
+    module: 'Courses & Programs',
+    category: 'Academic',
+    minutesOffset: 1850,
+    details: 'Intake capacity set to 30 and NEP credit structure validated.',
+    icon: 'menu_book'
+  },
+  {
+    id: 'act-014',
+    user: 'Rajesh Verma',
+    role: 'ERP Administrator',
+    operationType: 'Security',
+    action: 'assigned HOD governance role to',
+    target: 'Dr. Shalini Gupta (FAC-0006 — CSE)',
+    recordId: 'fac-6',
+    module: 'Roles & Permissions',
+    category: 'Security',
+    minutesOffset: 2020,
+    details: 'Departmental approval permissions granted under Academic Governance policy.',
+    icon: 'admin_panel_settings'
+  },
+  {
+    id: 'act-015',
+    user: 'Pooja Sharma',
+    role: 'Admissions Coordinator',
+    operationType: 'Approve',
+    action: 'verified admission dossier for',
+    target: 'Ananya Sharma (MCA-2025-002)',
+    recordId: 'stu-2',
+    module: 'Student Admissions',
+    category: 'People',
+    minutesOffset: 3200,
+    details: 'Qualifying degree marksheets and transfer certificate validated.',
+    icon: 'person_add'
+  },
+  {
+    id: 'act-016',
+    user: 'Prof. Sandeep Bansal',
+    role: 'Associate Professor (IT)',
+    operationType: 'Publish',
+    action: 'published course assignment for',
+    target: 'Cloud Computing & DevOps — Kubernetes Deployment Lab',
+    recordId: 'asgn-4',
+    module: 'Assignments',
+    category: 'Academic',
+    minutesOffset: 5900,
+    details: 'Worksheet posted with grading rubric and file submission enabled.',
+    icon: 'assignment_turned_in'
+  },
+  {
+    id: 'act-017',
+    user: 'Dr. Manish Aggarwal',
+    role: 'HOD Management Studies',
+    operationType: 'Update',
+    action: 'updated weekly class timetable for',
+    target: 'MCA Semester 2 Section A',
+    recordId: 'TT-MCA-2A',
+    module: 'Timetable',
+    category: 'Academic',
+    minutesOffset: 10500,
+    details: 'Lab slot reassigned to Block B Lab 2 with room clash validation.',
+    icon: 'calendar_month'
+  },
+  {
+    id: 'act-018',
+    user: 'Vikram Solanki',
+    role: 'Finance Head',
+    operationType: 'Create',
+    action: 'configured fee structure slab for',
+    target: 'Master of Computer Applications (AY 2025-26 · ₹1,20,000)',
+    recordId: 'fs-1',
+    module: 'Fee Structure',
+    category: 'Fees',
+    minutesOffset: 19200,
+    details: '2-installment breakdown published with ₹50/day late fine policy.',
+    icon: 'account_balance_wallet'
+  }
+];
+
+function computeTimingFields(timestampIso: string): {
+  period: ActivityPeriod;
+  relativeTime: string;
+  exactTime: string;
+  daysAgo: number;
+} {
+  const target = new Date(timestampIso);
+  if (Number.isNaN(target.getTime())) {
+    return {
+      period: 'Today',
+      relativeTime: 'Just now',
+      exactTime: 'Today',
+      daysAgo: 0
+    };
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfTarget = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const daysAgo = Math.max(0, Math.round((startOfToday - startOfTarget) / 86400000));
+
+  let period: ActivityPeriod = 'Earlier';
+  if (daysAgo === 0) period = 'Today';
+  else if (daysAgo === 1) period = 'Yesterday';
+
+  const diffMs = Math.max(0, now.getTime() - target.getTime());
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+
+  let relativeTime = '';
+  if (diffMins < 1) relativeTime = 'Just now';
+  else if (diffMins < 60) relativeTime = `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+  else if (daysAgo === 0) relativeTime = `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  else if (daysAgo === 1) {
+    relativeTime = `Yesterday at ${target.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  } else {
+    relativeTime = `${daysAgo} days ago`;
+  }
+
+  const exactTime =
+    daysAgo === 0
+      ? `Today at ${target.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+      : daysAgo === 1
+        ? `Yesterday at ${target.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+        : target.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+  return { period, relativeTime, exactTime, daysAgo };
+}
+
+function buildSeedActivities(): ActivityItem[] {
+  const now = Date.now();
+  return SEED_ACTIVITY_BASE.map(seed => {
+    const timestampIso = new Date(now - seed.minutesOffset * 60000).toISOString();
+    const timing = computeTimingFields(timestampIso);
+    return {
+      id: seed.id,
+      user: seed.user,
+      role: seed.role,
+      operationType: seed.operationType,
+      action: seed.action,
+      target: seed.target,
+      recordId: seed.recordId,
+      module: seed.module,
+      category: seed.category,
+      timestampIso,
+      details: seed.details,
+      icon: seed.icon,
+      ...timing
+    };
+  });
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class ActivityService {
-  // Master activity log for Apex Institute of Technology & Management (EduERP)
-  // Ready to be swapped with HttpClient GET /api/admin/activities in the next phase
-  private readonly activities = signal<ActivityItem[]>([
-    // Group: Today (daysAgo = 0)
-    {
-      id: 'act-001',
-      user: 'Admin (Dean Office)',
-      role: 'System Administrator',
-      action: 'enrolled new student',
-      target: 'Rahul Verma (MCA-2025-042) into MCA Semester 4',
-      module: 'Student Admissions',
-      category: 'People',
-      period: 'Today',
-      relativeTime: '12 mins ago',
-      exactTime: 'Today at 02:45 PM',
-      daysAgo: 0,
-      icon: 'person_add'
-    },
-    {
-      id: 'act-002',
-      user: 'Prof. Meena Sharma',
-      role: 'Associate Professor',
-      action: 'marked attendance for',
-      target: 'BCA Section A (58 Present, 4 Absent)',
-      module: 'Attendance Management',
-      category: 'Attendance',
-      period: 'Today',
-      relativeTime: '35 mins ago',
-      exactTime: 'Today at 02:22 PM',
-      daysAgo: 0,
-      icon: 'how_to_reg'
-    },
-    {
-      id: 'act-003',
-      user: 'Suresh Patil',
-      role: 'Accounts Officer',
-      action: 'collected semester fee of',
-      target: '₹25,000 from Sneha Kulkarni (B.Tech CSE - Roll #CS-2024-019)',
-      module: 'Fee Collection',
-      category: 'Fees',
-      period: 'Today',
-      relativeTime: '1 hour ago',
-      exactTime: 'Today at 01:50 PM',
-      daysAgo: 0,
-      icon: 'payments'
-    },
-    {
-      id: 'act-004',
-      user: 'Kavita Nair',
-      role: 'Registrar',
-      action: 'published official notice:',
-      target: 'Mid-term practical examination schedule for Even Semester 2026',
-      module: 'Notices & Announcements',
-      category: 'Notices',
-      period: 'Today',
-      relativeTime: '2 hours ago',
-      exactTime: 'Today at 12:40 PM',
-      daysAgo: 0,
-      icon: 'campaign'
-    },
-    {
-      id: 'act-005',
-      user: 'Dr. R.K. Raman',
-      role: 'Controller of Examinations',
-      action: 'generated examination hall seating plan for',
-      target: 'Even Sem End-Term Matrix (Halls B-101 through B-108)',
-      module: 'Examinations Cell',
-      category: 'Exams',
-      period: 'Today',
-      relativeTime: '3 hours ago',
-      exactTime: 'Today at 11:30 AM',
-      daysAgo: 0,
-      icon: 'assignment'
-    },
-    {
-      id: 'act-006',
-      user: 'Admin (Dean Office)',
-      role: 'System Administrator',
-      action: 'exported Attendance Report for',
-      target: 'MCA Semester 4 (Cumulative Monthly Sheet)',
-      module: 'Attendance Management',
-      category: 'Attendance',
-      period: 'Today',
-      relativeTime: '4 hours ago',
-      exactTime: 'Today at 10:20 AM',
-      daysAgo: 0,
-      icon: 'file_download'
-    },
-    {
-      id: 'act-007',
-      user: 'Dr. S. N. Roy',
-      role: 'HOD Computer Applications',
-      action: 'assigned project supervisor to',
-      target: 'MCA Project Batch 04 (Guide: Dr. Amit Joshi)',
-      module: 'Subject Allocation',
-      category: 'Academic',
-      period: 'Today',
-      relativeTime: '5 hours ago',
-      exactTime: 'Today at 09:45 AM',
-      daysAgo: 0,
-      icon: 'school'
-    },
-    {
-      id: 'act-008',
-      user: 'Dinesh Rathore',
-      role: 'Senior Accounts Officer',
-      action: 'dispatched automated fee reminder to',
-      target: '22 students with pending lab and tuition dues',
-      module: 'Pending Fees',
-      category: 'Fees',
-      period: 'Today',
-      relativeTime: '6 hours ago',
-      exactTime: 'Today at 08:30 AM',
-      daysAgo: 0,
-      icon: 'receipt_long'
-    },
-    {
-      id: 'act-009',
-      user: 'Prof. Ananya Sen',
-      role: 'Assistant Professor',
-      action: 'uploaded internal assessment scores for',
-      target: 'MCA-401 Cloud Infrastructure & DevOps (48 students)',
-      module: 'Results & Grades',
-      category: 'Academic',
-      period: 'Today',
-      relativeTime: '7 hours ago',
-      exactTime: 'Today at 07:45 AM',
-      daysAgo: 0,
-      icon: 'grade'
-    },
-    {
-      id: 'act-010',
-      user: 'Vikram Chauhan',
-      role: 'Security Systems Engineer',
-      action: 'flagged multiple failed login attempts on',
-      target: 'faculty account k.rao@eduerp.edu (IP: 103.21.124.9)',
-      module: 'Security Overview',
-      category: 'Security',
-      period: 'Today',
-      relativeTime: '8 hours ago',
-      exactTime: 'Today at 06:15 AM',
-      daysAgo: 0,
-      icon: 'shield'
-    },
+  private readonly platformId = inject(PLATFORM_ID);
 
-    // Group: Yesterday (daysAgo = 1)
-    {
-      id: 'act-011',
-      user: 'Dr. P. V. Ramamurthy',
-      role: 'Dean of Student Welfare',
-      action: 'approved medical condonation for',
-      target: 'Karan Malhotra (BCA-2024-088) with 68% attendance shortfall',
-      module: 'Attendance Management',
-      category: 'Attendance',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 05:40 PM',
-      exactTime: 'Yesterday at 05:40 PM',
-      daysAgo: 1,
-      icon: 'verified'
-    },
-    {
-      id: 'act-012',
-      user: 'Suresh Patil',
-      role: 'Accounts Officer',
-      action: 'verified NEFT fee receipt #REC-2026-9921 for',
-      target: '₹42,500 from Vikramaditya Chauhan (MCA Semester 2)',
-      module: 'Payment History',
-      category: 'Fees',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 04:15 PM',
-      exactTime: 'Yesterday at 04:15 PM',
-      daysAgo: 1,
-      icon: 'receipt'
-    },
-    {
-      id: 'act-013',
-      user: 'Prof. Rajesh Khanna',
-      role: 'Senior Faculty',
-      action: 'scheduled surprise revision evaluation for',
-      target: 'Discrete Mathematics in Hall 304 (Friday, 10:00 AM)',
-      module: 'Examinations Cell',
-      category: 'Exams',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 03:00 PM',
-      exactTime: 'Yesterday at 03:00 PM',
-      daysAgo: 1,
-      icon: 'event_note'
-    },
-    {
-      id: 'act-014',
-      user: 'Dr. Anita Desai',
-      role: 'Dean (Academics)',
-      action: 'updated course syllabus and lab manual for',
-      target: 'Artificial Intelligence & Robotics (AY 2025-26)',
-      module: 'Courses & Programs',
-      category: 'Academic',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 01:20 PM',
-      exactTime: 'Yesterday at 01:20 PM',
-      daysAgo: 1,
-      icon: 'menu_book'
-    },
-    {
-      id: 'act-015',
-      user: 'Rajesh Verma',
-      role: 'ERP Administrator',
-      action: 'assigned role Department Coordinator to',
-      target: 'Dr. Shalini Gupta (Dept of Information Science)',
-      module: 'Roles & Permissions',
-      category: 'People',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 11:45 AM',
-      exactTime: 'Yesterday at 11:45 AM',
-      daysAgo: 1,
-      icon: 'admin_panel_settings'
-    },
-    {
-      id: 'act-016',
-      user: 'Prof. T. P. Raman',
-      role: 'Faculty Coordinator',
-      action: 'marked lab practical attendance for',
-      target: 'Embedded Systems Lab Batch 02 (32 Present, 0 Absent)',
-      module: 'Attendance Management',
-      category: 'Attendance',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 10:15 AM',
-      exactTime: 'Yesterday at 10:15 AM',
-      daysAgo: 1,
-      icon: 'how_to_reg'
-    },
-    {
-      id: 'act-017',
-      user: 'Dr. R.K. Raman',
-      role: 'Controller of Examinations',
-      action: 'published semester supplementary results for',
-      target: 'MCA & B.Tech 3rd Semester Revaluation Candidates',
-      module: 'Results & Grades',
-      category: 'Exams',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 09:30 AM',
-      exactTime: 'Yesterday at 09:30 AM',
-      daysAgo: 1,
-      icon: 'assessment'
-    },
-    {
-      id: 'act-018',
-      user: 'Vikram Chauhan',
-      role: 'Systems Engineer',
-      action: 'completed full database snapshot to',
-      target: 'Encrypted Cloud Storage (archive-2026-11-10.sql.enc)',
-      module: 'Audit Logs',
-      category: 'Security',
-      period: 'Yesterday',
-      relativeTime: 'Yesterday at 02:00 AM',
-      exactTime: 'Yesterday at 02:00 AM',
-      daysAgo: 1,
-      icon: 'cloud_upload'
-    },
+  private readonly _rawActivities = signal<ActivityItem[]>(this.loadInitialActivities());
+  private readonly _authUid = signal<string | null>(auth.currentUser?.uid ?? null);
+  private readonly _isCloudSynced = signal<boolean>(false);
+  private activityUnsub: Unsubscribe | null = null;
 
-    // Group: Earlier (daysAgo >= 2)
-    {
-      id: 'act-019',
-      user: 'Pooja Sharma',
-      role: 'Admissions Coordinator',
-      action: 'approved lateral entry admission for',
-      target: 'Pooja Iyer (B.Tech CSE - Direct 2nd Year Diploma Quota)',
-      module: 'Student Admissions',
-      category: 'People',
-      period: 'Earlier',
-      relativeTime: '2 days ago',
-      exactTime: '09 Nov 2026, 04:30 PM',
-      daysAgo: 2,
-      icon: 'person_add'
-    },
-    {
-      id: 'act-020',
-      user: 'Ramesh Bhatia',
-      role: 'Senior Accountant',
-      action: 'reconciled bank gateway batch with',
-      target: 'SBI Collect e-Challan Settlement #TXN-88491 (₹3,85,000)',
-      module: 'Fee Collection',
-      category: 'Fees',
-      period: 'Earlier',
-      relativeTime: '3 days ago',
-      exactTime: '08 Nov 2026, 03:15 PM',
-      daysAgo: 3,
-      icon: 'account_balance'
-    },
-    {
-      id: 'act-021',
-      user: 'Prof. Sandeep Bansal',
-      role: 'Associate Professor (IT)',
-      action: 'assigned term project submission deadline to',
-      target: 'MCA Sem 4: Enterprise Web Application Architecture',
-      module: 'Assignments',
-      category: 'Academic',
-      period: 'Earlier',
-      relativeTime: '4 days ago',
-      exactTime: '07 Nov 2026, 11:00 AM',
-      daysAgo: 4,
-      icon: 'assignment_turned_in'
-    },
-    {
-      id: 'act-022',
-      user: 'Sunil Jadhav',
-      role: 'Card Bureau Officer',
-      action: 'issued campus identity smart cards to',
-      target: '75 newly enrolled first-year postgraduate students',
-      module: 'User Accounts',
-      category: 'Security',
-      period: 'Earlier',
-      relativeTime: '5 days ago',
-      exactTime: '06 Nov 2026, 02:20 PM',
-      daysAgo: 5,
-      icon: 'badge'
-    },
-    {
-      id: 'act-023',
-      user: 'Dr. R.K. Raman',
-      role: 'Controller of Examinations',
-      action: 'appointed external examiners for',
-      target: 'MCA Semester 4 Major Project Viva Voce Board',
-      module: 'Examinations Cell',
-      category: 'Exams',
-      period: 'Earlier',
-      relativeTime: '6 days ago',
-      exactTime: '05 Nov 2026, 10:45 AM',
-      daysAgo: 6,
-      icon: 'fact_check'
-    },
-    {
-      id: 'act-024',
-      user: 'Prof. Neha Deshmukh',
-      role: 'Assistant Professor',
-      action: 'compiled monthly attendance report for',
-      target: 'Advanced Java Programming (Cumulative Average: 88.4%)',
-      module: 'Attendance Analytics',
-      category: 'Attendance',
-      period: 'Earlier',
-      relativeTime: '7 days ago',
-      exactTime: '04 Nov 2026, 04:00 PM',
-      daysAgo: 7,
-      icon: 'bar_chart'
-    },
-    {
-      id: 'act-025',
-      user: 'Dr. Manish Aggarwal',
-      role: 'HOD Mechanical Engineering',
-      action: 'modified weekly class timetable for',
-      target: 'M.Tech CAD/CAM Section B (Shifted Lab to Thursday)',
-      module: 'Timetable',
-      category: 'Academic',
-      period: 'Earlier',
-      relativeTime: '9 days ago',
-      exactTime: '02 Nov 2026, 01:15 PM',
-      daysAgo: 9,
-      icon: 'calendar_month'
-    },
-    {
-      id: 'act-026',
-      user: 'Rajesh Verma',
-      role: 'ERP Administrator',
-      action: 'reset two-factor authentication tokens for',
-      target: 'Prof. Arvind Swaminathan (Dept of Mathematics)',
-      module: 'Security Overview',
-      category: 'Security',
-      period: 'Earlier',
-      relativeTime: '12 days ago',
-      exactTime: '30 Oct 2026, 11:30 AM',
-      daysAgo: 12,
-      icon: 'lock_reset'
-    },
-    {
-      id: 'act-027',
-      user: 'Pooja Sharma',
-      role: 'Student Affairs Coordinator',
-      action: 'dispatched automated SMS alerts to',
-      target: '18 parents regarding student attendance below 75% threshold',
-      module: 'Message Center',
-      category: 'Attendance',
-      period: 'Earlier',
-      relativeTime: '14 days ago',
-      exactTime: '28 Oct 2026, 09:00 AM',
-      daysAgo: 14,
-      icon: 'sms'
-    },
-    {
-      id: 'act-028',
-      user: 'Vikram Solanki',
-      role: 'Finance Head',
-      action: 'published approved annual fee schedule for',
-      target: 'Academic Year 2026-27 Hostel & Transportation Slabs',
-      module: 'Fee Structure',
-      category: 'Fees',
-      period: 'Earlier',
-      relativeTime: '18 days ago',
-      exactTime: '24 Oct 2026, 03:30 PM',
-      daysAgo: 18,
-      icon: 'account_balance_wallet'
-    },
-    {
-      id: 'act-029',
-      user: 'Dr. Anita Desai',
-      role: 'Dean (Academics)',
-      action: 'finalized institutional academic calendar for',
-      target: 'Winter Break, End-Term Practical & Theory Exam Windows',
-      module: 'Academic Years',
-      category: 'Academic',
-      period: 'Earlier',
-      relativeTime: '21 days ago',
-      exactTime: '21 Oct 2026, 02:00 PM',
-      daysAgo: 21,
-      icon: 'date_range'
-    },
-    {
-      id: 'act-030',
-      user: 'Vikram Chauhan',
-      role: 'Security Systems Engineer',
-      action: 'renewed institutional SSL certificates and keys for',
-      target: 'portal.eduerp.edu and identity authentication gateways',
-      module: 'Security Overview',
-      category: 'Security',
-      period: 'Earlier',
-      relativeTime: '26 days ago',
-      exactTime: '16 Oct 2026, 05:00 AM',
-      daysAgo: 26,
-      icon: 'vpn_key'
-    },
-    {
-      id: 'act-031',
-      user: 'Prof. Harish Rawat',
-      role: 'Sports Director',
-      action: 'published official circular:',
-      target: 'Annual Inter-Collegiate Athletics Meet 2026 selection trials',
-      module: 'Notices & Announcements',
-      category: 'Notices',
-      period: 'Earlier',
-      relativeTime: '28 days ago',
-      exactTime: '14 Oct 2026, 11:15 AM',
-      daysAgo: 28,
-      icon: 'campaign'
-    },
-    {
-      id: 'act-032',
-      user: 'Kavita Nair',
-      role: 'Registrar',
-      action: 'verified original qualifying degrees for',
-      target: '35 MCA Batch 2025-27 Lateral Entry candidates',
-      module: 'Student Admissions',
-      category: 'People',
-      period: 'Earlier',
-      relativeTime: '29 days ago',
-      exactTime: '13 Oct 2026, 03:45 PM',
-      daysAgo: 29,
-      icon: 'verified_user'
+  readonly isCloudSynced = this._isCloudSynced.asReadonly();
+
+  readonly items = computed<ActivityItem[]>(() => {
+    return this._rawActivities()
+      .map(item => ({
+        ...item,
+        ...computeTimingFields(item.timestampIso)
+      }))
+      .sort((a, b) => b.timestampIso.localeCompare(a.timestampIso));
+  });
+
+  constructor() {
+    if (isPlatformBrowser(this.platformId)) {
+      void testFirestoreConnection();
+
+      onAuthStateChanged(auth, user => {
+        const uid = user?.uid ?? null;
+        this._authUid.set(uid);
+        this.teardownListener();
+        if (uid) {
+          this.attachListener(uid);
+        } else {
+          this._isCloudSynced.set(false);
+        }
+      });
+
+      if (auth.currentUser?.uid) {
+        this.attachListener(auth.currentUser.uid);
+      }
     }
-  ]);
-
-  /**
-   * Returns all activity logs.
-   * In a future release with backend APIs, this will return an HttpClient observable.
-   */
-  getActivities(): ActivityItem[] {
-    return this.activities();
   }
 
-  /**
-   * Helper to append a new activity programmatically
-   */
-  logActivity(item: Omit<ActivityItem, 'id'>): void {
+  private loadInitialActivities(): ActivityItem[] {
+    const seeds = buildSeedActivities();
+    if (!isPlatformBrowser(this.platformId)) return seeds;
+    try {
+      const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ActivityItem[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(item => ({
+            ...item,
+            operationType: item.operationType || this.inferOperation(item.action),
+            timestampIso: item.timestampIso || new Date().toISOString(),
+            ...computeTimingFields(item.timestampIso || new Date().toISOString())
+          }));
+        }
+      }
+    } catch {
+      // ignore corrupted localStorage
+    }
+    return seeds;
+  }
+
+  private saveLocalActivities(list: ActivityItem[]): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(list.slice(0, 150)));
+    } catch {
+      // ignore storage quota errors
+    }
+  }
+
+  private teardownListener(): void {
+    this.activityUnsub?.();
+    this.activityUnsub = null;
+  }
+
+  private attachListener(uid: string): void {
+    this._isCloudSynced.set(true);
+    const actQ = query(collection(db, 'institutionalActivities'), where('ownerUid', '==', uid));
+    this.activityUnsub = onSnapshot(
+      actQ,
+      snapshot => {
+        if (snapshot.docs.length === 0) return;
+        this._rawActivities.update(local => {
+          const byId = new Map(local.map(item => [item.id, item]));
+          for (const d of snapshot.docs) {
+            const data = d.data() as Omit<ActivityItem, 'period' | 'relativeTime' | 'exactTime' | 'daysAgo'>;
+            byId.set(data.id, {
+              ...data,
+              ...computeTimingFields(data.timestampIso)
+            });
+          }
+          const merged = Array.from(byId.values()).sort((a, b) =>
+            b.timestampIso.localeCompare(a.timestampIso)
+          );
+          this.saveLocalActivities(merged);
+          return merged;
+        });
+      },
+      error => handleFirestoreError(error, OperationType.LIST, 'institutionalActivities')
+    );
+  }
+
+  private inferOperation(action: string): ActivityOperationType {
+    const a = action.toLowerCase();
+    if (a.includes('approv')) return 'Approve';
+    if (a.includes('reject') || a.includes('return')) return 'Reject';
+    if (a.includes('publish') || a.includes('broadcast') || a.includes('dispatch')) return 'Publish';
+    if (a.includes('export') || a.includes('download')) return 'Export';
+    if (a.includes('delet') || a.includes('remov') || a.includes('cancel')) return 'Delete';
+    if (a.includes('security') || a.includes('flag') || a.includes('role') || a.includes('lock')) return 'Security';
+    if (a.includes('updat') || a.includes('modif') || a.includes('mark') || a.includes('allocat')) return 'Update';
+    return 'Create';
+  }
+
+  getActivities(): ActivityItem[] {
+    return this.items();
+  }
+
+  logActivity(item: ActivityLogInput): void {
+    const timestampIso = item.timestampIso || new Date().toISOString();
+    const operationType = item.operationType || this.inferOperation(item.action);
+    const id = `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const timing = computeTimingFields(timestampIso);
+
     const newItem: ActivityItem = {
-      ...item,
-      id: `act-${Date.now()}`
+      id,
+      user: item.user,
+      role: item.role,
+      operationType,
+      action: item.action,
+      target: item.target,
+      recordId: item.recordId,
+      module: item.module,
+      category: item.category,
+      timestampIso,
+      details: item.details,
+      icon: item.icon,
+      ...timing
     };
-    this.activities.update(current => [newItem, ...current]);
+
+    this._rawActivities.update(current => {
+      const next = [newItem, ...current];
+      this.saveLocalActivities(next);
+      return next;
+    });
+
+    const uid = this._authUid() ?? auth.currentUser?.uid ?? null;
+    if (uid && isPlatformBrowser(this.platformId)) {
+      const firestorePayload: Record<string, unknown> = {
+        id: newItem.id,
+        user: newItem.user.slice(0, 120),
+        role: newItem.role.slice(0, 80),
+        operationType: newItem.operationType,
+        action: newItem.action.slice(0, 160),
+        target: newItem.target.slice(0, 300),
+        module: newItem.module.slice(0, 80),
+        category: newItem.category,
+        timestampIso: newItem.timestampIso.slice(0, 60),
+        icon: newItem.icon.slice(0, 60),
+        ownerUid: uid
+      };
+      if (newItem.recordId) {
+        firestorePayload['recordId'] = newItem.recordId.slice(0, 128);
+      }
+      if (newItem.details) {
+        firestorePayload['details'] = newItem.details.slice(0, 500);
+      }
+      void setDoc(doc(db, 'institutionalActivities', newItem.id), firestorePayload).catch(error => {
+        handleFirestoreError(error, OperationType.WRITE, `institutionalActivities/${newItem.id}`);
+      });
+    }
   }
 }

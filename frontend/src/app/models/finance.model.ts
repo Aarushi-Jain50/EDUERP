@@ -26,6 +26,19 @@ export interface FeeStructure {
   status: 'Active' | 'Inactive';
 }
 
+export interface Scholarship {
+  id: string;
+  name: string;
+  code: string;
+  type: 'Percentage' | 'Fixed';
+  value: number;
+  courseId: string; // 'All' or specific course id
+  courseName: string;
+  eligibility: string;
+  maxRecipients: number;
+  status: 'Active' | 'Inactive';
+}
+
 export interface StudentInstallmentLedger {
   installmentId: string;
   label: string;
@@ -50,6 +63,7 @@ export interface PaymentItem {
   installmentId: string;
   amount: number;
   fine: number;
+  concession?: number;
 }
 
 export interface Payment {
@@ -62,6 +76,7 @@ export interface Payment {
   subtotal: number;
   concession: number;
   concessionReason?: string;
+  scholarshipCode?: string;
   fine: number;
   total: number;
   mode: PaymentMode;
@@ -70,4 +85,5 @@ export interface Payment {
   collectedBy: string;
   status: 'Paid' | 'Cancelled';
   cancelReason?: string;
+  cancelledAt?: string;
 }

@@ -15,7 +15,14 @@
         "department": { "type": "string", "maxLength": 100 },
         "semester": { "type": "string", "maxLength": 20 },
         "section": { "type": "string", "maxLength": 20 },
+        "batchName": { "type": "string", "maxLength": 40 },
+        "academicYear": { "type": "string", "maxLength": 30 },
         "status": { "type": "string", "maxLength": 30 },
+        "gender": { "type": "string", "maxLength": 20 },
+        "dob": { "type": "string", "maxLength": 30 },
+        "admissionDate": { "type": "string", "maxLength": 30 },
+        "guardian": { "type": "object" },
+        "documents": { "type": "array", "maxItems": 20 },
         "ownerUid": { "type": "string", "maxLength": 128 },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -23,21 +30,25 @@
     },
     "Assignment": {
       "title": "Assignment",
-      "description": "Course assignments and multi-subject worksheets",
+      "description": "Course assignments, homework tasks, and evaluation worksheets",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
         "title": { "type": "string", "maxLength": 200 },
-        "subjectCode": { "type": "string", "maxLength": 30 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "taskType": { "type": "string", "enum": ["Assignment", "Homework"] },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 160 },
+        "sectionId": { "type": "string", "maxLength": 128 },
+        "sectionName": { "type": "string", "maxLength": 80 },
+        "assignedOn": { "type": "string", "maxLength": 50 },
         "dueDate": { "type": "string", "maxLength": 50 },
-        "status": { "type": "string", "maxLength": 30 },
-        "submittedAt": { "type": "string", "maxLength": 50 },
-        "grade": { "type": "string", "maxLength": 20 },
-        "feedback": { "type": "string", "maxLength": 500 },
-        "studentId": { "type": "string", "maxLength": 128 },
+        "maxMarks": { "type": "number", "minimum": 0 },
+        "status": { "type": "string", "enum": ["Active", "Closed", "Overdue"] },
+        "allowLateSubmission": { "type": "boolean" },
         "ownerUid": { "type": "string", "maxLength": 128 }
       },
-      "required": ["id", "title", "subjectCode", "studentId", "ownerUid"]
+      "required": ["id", "title", "subjectId", "sectionId", "ownerUid"]
     },
     "AssignmentSubmission": {
       "title": "Assignment Submission",
@@ -223,12 +234,192 @@
         "verificationHash",
         "ownerUid"
       ]
+    },
+    "InstitutionalActivity": {
+      "title": "Institutional Activity",
+      "description": "Chronological feed of academic, operational, financial, and security actions across EduERP",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "maxLength": 80 },
+        "operationType": { "type": "string", "enum": ["Create", "Update", "Delete", "Approve", "Reject", "Publish", "Export", "Security"] },
+        "action": { "type": "string", "maxLength": 160 },
+        "target": { "type": "string", "maxLength": 300 },
+        "recordId": { "type": "string", "maxLength": 128 },
+        "module": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "enum": ["Academic", "People", "Attendance", "Exams", "Fees", "Notices", "Security"] },
+        "timestampIso": { "type": "string", "maxLength": 60 },
+        "details": { "type": "string", "maxLength": 500 },
+        "icon": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": [
+        "id",
+        "user",
+        "role",
+        "operationType",
+        "action",
+        "target",
+        "module",
+        "category",
+        "timestampIso",
+        "icon",
+        "ownerUid"
+      ]
+    },
+    "AdminAuditLog": {
+      "title": "Admin Audit Log",
+      "description": "Immutable security and governance audit trail with change tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userName": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "maxLength": 60 },
+        "module": { "type": "string", "maxLength": 80 },
+        "action": { "type": "string", "maxLength": 80 },
+        "target": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["Success", "Failure", "Warning", "Failed"] },
+        "ipAddress": { "type": "string", "maxLength": 64 },
+        "oldValue": { "type": "string", "maxLength": 1000 },
+        "newValue": { "type": "string", "maxLength": 1000 },
+        "timestampIso": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "userId", "userName", "role", "module", "action", "target", "status", "timestampIso", "ownerUid"]
+    },
+    "AdminUser": {
+      "title": "Authorized Admin Directory",
+      "description": "Trusted institutional administrators authorized for ERP governance",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 120 },
+        "name": { "type": "string", "maxLength": 120 },
+        "isSuperAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 60 }
+      },
+      "required": ["uid", "email", "name", "isSuperAdmin", "createdAt"]
+    },
+    "AcademicYear": {
+      "title": "Academic Year Session",
+      "description": "Institutional academic session period and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "year": { "type": "string", "maxLength": 40 },
+        "startDate": { "type": "string", "maxLength": 40 },
+        "endDate": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["Active", "Upcoming", "Completed"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "year", "startDate", "endDate", "status", "ownerUid"]
+    },
+    "AcademicCalendarEvent": {
+      "title": "Academic Calendar Milestone",
+      "description": "Admission, registration, exam, and holiday calendar period",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "academicYear": { "type": "string", "maxLength": 40 },
+        "title": { "type": "string", "maxLength": 160 },
+        "periodType": { "type": "string", "maxLength": 60 },
+        "startDate": { "type": "string", "maxLength": 40 },
+        "endDate": { "type": "string", "maxLength": 40 },
+        "description": { "type": "string", "maxLength": 500 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "academicYear", "title", "periodType", "startDate", "endDate", "ownerUid"]
+    },
+    "AcademicEntityRecord": {
+      "title": "Academic Structure Document",
+      "description": "Department, Course, Semester, Section, Batch, Subject, or Allocation document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "ownerUid"]
+    },
+    "PeopleDirectoryRecord": {
+      "title": "People Lifecycle Document",
+      "description": "Admission application, Faculty, Parent, UserAccount, or Role definition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "maxLength": 60 },
+        "ownerUid": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "ownerUid"]
     }
   },
   "firestore": {
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Trusted institutional administrators"
+    },
     "/students/{studentId}": {
       "schema": { "$ref": "#/entities/Student" },
       "description": "Student profile documents"
+    },
+    "/studentAdmissions/{admissionId}": {
+      "schema": { "$ref": "#/entities/PeopleDirectoryRecord" },
+      "description": "Student admission applications and verification checklist"
+    },
+    "/facultyMembers/{facultyId}": {
+      "schema": { "$ref": "#/entities/PeopleDirectoryRecord" },
+      "description": "Faculty teaching roster"
+    },
+    "/parents/{parentId}": {
+      "schema": { "$ref": "#/entities/PeopleDirectoryRecord" },
+      "description": "Parent and guardian records"
+    },
+    "/userAccounts/{accountId}": {
+      "schema": { "$ref": "#/entities/PeopleDirectoryRecord" },
+      "description": "System user accounts and lock status"
+    },
+    "/roles/{roleId}": {
+      "schema": { "$ref": "#/entities/PeopleDirectoryRecord" },
+      "description": "Role definitions and module permissions matrix"
+    },
+    "/academicYears/{yearId}": {
+      "schema": { "$ref": "#/entities/AcademicYear" },
+      "description": "Academic session boundaries"
+    },
+    "/academicCalendarEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/AcademicCalendarEvent" },
+      "description": "Institutional academic calendar periods"
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Academic departments and HOD assignments"
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Degree courses and eligibility criteria"
+    },
+    "/semesters/{semesterId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Semester schedules, registration, and exam periods"
+    },
+    "/sections/{sectionId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Classroom sections and capacities"
+    },
+    "/batches/{batchId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Student cohort batches"
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Course curriculum subjects and prerequisites"
+    },
+    "/subjectAllocations/{allocationId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Faculty subject workload allocations"
     },
     "/assignments/{assignmentId}": {
       "schema": { "$ref": "#/entities/Assignment" },
@@ -253,6 +444,58 @@
     "/examAttempts/{attemptId}": {
       "schema": { "$ref": "#/entities/ExamAttempt" },
       "description": "Protected online and hybrid exam attempts and proctor logs"
+    },
+    "/institutionalActivities/{activityId}": {
+      "schema": { "$ref": "#/entities/InstitutionalActivity" },
+      "description": "Institutional live activity feed across portals"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Immutable institutional audit logs"
+    },
+    "/attendanceSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Class attendance sessions and per-student presence statuses"
+    },
+    "/examinations/{examId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Scheduled institutional examinations, venues, and hall ticket states"
+    },
+    "/examResults/{resultId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Examination marks, grades, approval workflow state, and moderation lock"
+    },
+    "/timetableSlots/{slotId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Weekly timetable slots with faculty and room assignments"
+    },
+    "/feeStructures/{structureId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Course-wise annual fee structures, fee heads, and installment schedules"
+    },
+    "/scholarships/{scholarshipId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Institutional scholarship, merit waiver, and financial concession schemes"
+    },
+    "/feeReceipts/{paymentId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Institutional fee payment receipts, concessions, and cancellation audit state"
+    },
+    "/notices/{noticeId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Official institutional notices, circulars, and scheduled announcements"
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Internal institutional messages across admin, faculty, student, and parent desks"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Real-time institutional alert broadcasts and notification items"
+    },
+    "/systemSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/AcademicEntityRecord" },
+      "description": "Persisted institutional settings, grading scale, fee policies, admin profile, and lockout state"
     }
   }
 }

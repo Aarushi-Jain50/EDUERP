@@ -10,6 +10,7 @@ import {
   ModulePermission,
   SIDEBAR_MODULE_GROUPS
 } from '../../../models/user-role.model';
+import { exportToExcel } from '../../../utils/export.helper';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -22,30 +23,39 @@ import {
   ],
   template: `
     <div class="flex flex-col gap-5 max-w-[1400px] mx-auto w-full font-sans relative">
-      
-      <!-- Toast Notification Banner -->
+
       @if (saveToastMessage()) {
-        <div class="fixed top-20 right-6 z-50 p-3.5 bg-emerald-900 text-white rounded-2xl shadow-2xl border border-emerald-500 max-w-md w-full animate-in slide-in-from-top-5 duration-200 flex items-center justify-between">
+        <div class="fixed top-20 right-6 z-50 p-3.5 bg-emerald-900 text-white rounded-2xl shadow-2xl border border-emerald-500 max-w-md w-full flex items-center justify-between">
           <div class="flex items-center gap-2.5">
             <span class="material-icons text-emerald-400 text-lg">check_circle</span>
             <span class="text-xs font-semibold">{{ saveToastMessage() }}</span>
           </div>
-          <button (click)="saveToastMessage.set(null)" class="text-emerald-300 hover:text-white p-1">
+          <button type="button" (click)="saveToastMessage.set(null)" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
             <span class="material-icons text-xs">close</span>
           </button>
         </div>
       }
 
-      <!-- 1. Page Header -->
-      <app-page-header
-        title="Roles & Permissions"
-        subtitle="Configure module-level access control matrix and system permissions."
-        primaryActionLabel="Add Custom Role"
-        primaryActionIcon="add_moderator"
-        (primaryActionClicked)="openAddRoleDrawer()"
-      />
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <app-page-header
+          class="flex-1"
+          title="Roles & Permissions"
+          subtitle="Configure granular module-level RBAC permissions matrix across all system roles."
+          actionLabel="Add Custom Role"
+          actionIcon="add_moderator"
+          (actionClicked)="openAddRoleDrawer()"
+        />
+        <button
+          type="button"
+          (click)="exportMatrixExcel()"
+          class="h-10 px-3.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+        >
+          <span class="material-icons text-sm text-emerald-600">table_view</span>
+          <span>Export Matrix (Excel)</span>
+        </button>
+      </div>
 
-      <!-- Mobile Role Selector Dropdown (Visible only on mobile 360px - lg) -->
+      <!-- Mobile Role Selector Dropdown -->
       <div class="block lg:hidden bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
         <label for="mobile-role-select" class="block text-xs font-bold text-slate-700 mb-1">Select Role to Edit Permissions:</label>
         <select
@@ -60,10 +70,10 @@ import {
         </select>
       </div>
 
-      <!-- Main Two-Column Layout (Desktop) -->
+      <!-- Main Two-Column Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        
-        <!-- LEFT COLUMN: Roles List Card (4 Cols on LG) -->
+
+        <!-- LEFT COLUMN: Roles List Card -->
         <div class="hidden lg:block lg:col-span-4 bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
           <div class="p-4 border-b border-[#E2E8F0] bg-slate-50/70 flex items-center justify-between">
             <div>
@@ -81,13 +91,15 @@ import {
 
           <div class="p-2 space-y-1.5 max-h-[640px] overflow-y-auto">
             @for (role of rolesWithCounts(); track role.id) {
-              <button
-                type="button"
-                (click)="selectRole(role.id)"
-                class="w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer group flex items-start justify-between gap-2"
+              <div
+                class="w-full p-3.5 rounded-xl border transition-all flex items-start justify-between gap-2"
                 [class]="selectedRoleId() === role.id ? 'bg-[#1A1745] text-white border-[#1A1745] shadow-md' : 'bg-white hover:bg-slate-50 border-[#E2E8F0] text-slate-800'"
               >
-                <div class="flex-1 min-w-0">
+                <button
+                  type="button"
+                  (click)="selectRole(role.id)"
+                  class="flex-1 min-w-0 text-left cursor-pointer"
+                >
                   <div class="flex items-center gap-2">
                     <span class="font-bold text-xs truncate" [class.text-white]="selectedRoleId() === role.id" [class.text-slate-900]="selectedRoleId() !== role.id">
                       {{ role.name }}
@@ -106,7 +118,7 @@ import {
                   <p class="text-[11px] mt-1 line-clamp-2 leading-relaxed" [class.text-purple-200]="selectedRoleId() === role.id" [class.text-slate-500]="selectedRoleId() !== role.id">
                     {{ role.description }}
                   </p>
-                </div>
+                </button>
 
                 <div class="flex flex-col items-end justify-between self-stretch shrink-0 gap-2">
                   <span
@@ -121,37 +133,27 @@ import {
                       type="button"
                       aria-label="Delete custom role"
                       (click)="openDeleteRoleDialog(role, $event)"
-                      class="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors"
-                      [class.text-purple-300]="selectedRoleId() === role.id"
-                      [class.hover:text-red-300]="selectedRoleId() === role.id"
+                      class="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors cursor-pointer"
                     >
                       <span class="material-icons text-sm">delete</span>
                     </button>
                   }
                 </div>
-              </button>
+              </div>
             }
           </div>
         </div>
 
-        <!-- RIGHT COLUMN: Permissions Matrix Card (8 Cols on LG) -->
+        <!-- RIGHT COLUMN: Permissions Matrix Card -->
         @if (activeRole(); as role) {
           <div class="lg:col-span-8 bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden flex flex-col">
-            
-            <!-- Matrix Header -->
             <div class="p-4 sm:p-5 border-b border-[#E2E8F0] bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <h2 class="text-base font-bold text-slate-900 tracking-tight">{{ role.name }} Permissions Matrix</h2>
-                  @if (role.isSystem) {
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-200 text-slate-700 flex items-center gap-1">
-                      <span class="material-icons text-[10px]">lock</span> System Role
-                    </span>
-                  } @else {
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-purple-50 text-[#6D42E8] border border-purple-200">
-                      Custom Role
-                    </span>
-                  }
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {{ enabledPermissionCount().enabled }} / {{ enabledPermissionCount().total }} Permissions
+                  </span>
                 </div>
                 <p class="text-xs text-[#64748B] mt-0.5">{{ role.description }}</p>
               </div>
@@ -159,16 +161,13 @@ import {
               @if (role.name === 'Super Admin') {
                 <div class="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900 flex items-center gap-1.5 shrink-0">
                   <span class="material-icons text-sm text-amber-600">verified_user</span>
-                  <span>Super Admin has all permissions enabled by default.</span>
+                  <span>Super Admin has unrestricted access.</span>
                 </div>
               }
             </div>
 
-            <!-- Matrix Body: Scrollable Table -->
             <div class="overflow-x-auto max-h-[580px] overflow-y-auto">
               <table class="w-full text-left border-collapse font-sans text-xs">
-                
-                <!-- Sticky Table Header (40px) -->
                 <thead class="sticky top-0 bg-slate-100 border-b border-[#E2E8F0] z-20 shadow-2xs">
                   <tr class="h-10 text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
                     <th scope="col" class="px-4 py-2 w-1/3">Module / Section</th>
@@ -182,81 +181,39 @@ import {
 
                 <tbody class="divide-y divide-slate-200">
                   @for (group of moduleGroups; track group.groupName) {
-                    
-                    <!-- Group Header Row -->
                     <tr class="bg-purple-50/60 font-bold text-[11px] uppercase tracking-wider text-purple-900 h-9">
                       <td class="px-4 py-2 flex items-center gap-1.5">
                         <span class="material-icons text-xs text-[#6D42E8]">folder</span>
                         <span>{{ group.groupName }}</span>
                       </td>
-                      <td colspan="4" class="px-4 py-2 text-right text-[10px] text-purple-700">
-                        Group Permissions
-                      </td>
+                      <td colspan="4" class="px-4 py-2 text-right text-[10px] text-purple-700">Group Permissions</td>
                       <td class="px-4 py-2 text-center">
                         <input
                           type="checkbox"
                           [disabled]="role.name === 'Super Admin'"
                           [checked]="isGroupFullyChecked(group.groupName)"
                           (change)="toggleGroupPermissions(group.groupName, $any($event.target).checked)"
-                          title="Select / Deselect all permissions in this group"
-                          class="w-4 h-4 rounded text-[#6D42E8] focus:ring-[#6D42E8] border-purple-300 cursor-pointer disabled:opacity-40"
+                          class="w-4 h-4 rounded text-[#6D42E8] border-purple-300 cursor-pointer disabled:opacity-40"
                         />
                       </td>
                     </tr>
 
-                    <!-- Modules in Group (40px compact rows) -->
                     @for (mod of group.modules; track mod.key) {
                       @let p = getPermission(mod.key);
                       <tr class="h-10 hover:bg-slate-50 transition-colors">
-                        <td class="px-4 py-2 font-medium text-slate-800 pl-8">
-                          {{ mod.label }}
-                        </td>
-
-                        <!-- View -->
+                        <td class="px-4 py-2 font-medium text-slate-800 pl-8">{{ mod.label }}</td>
                         <td class="px-4 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            [disabled]="role.name === 'Super Admin'"
-                            [checked]="p.view"
-                            (change)="togglePermission(mod.key, 'view', $any($event.target).checked)"
-                            class="w-4 h-4 rounded text-[#6D42E8] focus:ring-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40"
-                          />
+                          <input type="checkbox" [disabled]="role.name === 'Super Admin'" [checked]="p.view" (change)="togglePermission(mod.key, 'view', $any($event.target).checked)" class="w-4 h-4 rounded text-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40" />
                         </td>
-
-                        <!-- Create -->
                         <td class="px-4 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            [disabled]="role.name === 'Super Admin'"
-                            [checked]="p.create"
-                            (change)="togglePermission(mod.key, 'create', $any($event.target).checked)"
-                            class="w-4 h-4 rounded text-[#6D42E8] focus:ring-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40"
-                          />
+                          <input type="checkbox" [disabled]="role.name === 'Super Admin'" [checked]="p.create" (change)="togglePermission(mod.key, 'create', $any($event.target).checked)" class="w-4 h-4 rounded text-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40" />
                         </td>
-
-                        <!-- Edit -->
                         <td class="px-4 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            [disabled]="role.name === 'Super Admin'"
-                            [checked]="p.edit"
-                            (change)="togglePermission(mod.key, 'edit', $any($event.target).checked)"
-                            class="w-4 h-4 rounded text-[#6D42E8] focus:ring-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40"
-                          />
+                          <input type="checkbox" [disabled]="role.name === 'Super Admin'" [checked]="p.edit" (change)="togglePermission(mod.key, 'edit', $any($event.target).checked)" class="w-4 h-4 rounded text-[#6D42E8] border-slate-300 cursor-pointer disabled:opacity-40" />
                         </td>
-
-                        <!-- Delete -->
                         <td class="px-4 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            [disabled]="role.name === 'Super Admin'"
-                            [checked]="p.delete"
-                            (change)="togglePermission(mod.key, 'delete', $any($event.target).checked)"
-                            class="w-4 h-4 rounded text-red-600 focus:ring-red-500 border-slate-300 cursor-pointer disabled:opacity-40"
-                          />
+                          <input type="checkbox" [disabled]="role.name === 'Super Admin'" [checked]="p.delete" (change)="togglePermission(mod.key, 'delete', $any($event.target).checked)" class="w-4 h-4 rounded text-red-600 border-slate-300 cursor-pointer disabled:opacity-40" />
                         </td>
-
-                        <!-- Per-Row Select All -->
                         <td class="px-4 py-2 text-center">
                           <button
                             type="button"
@@ -274,7 +231,6 @@ import {
               </table>
             </div>
 
-            <!-- Footer Bar with Discard & Save Changes (Enabled only when changed) -->
             <div class="p-4 border-t border-[#E2E8F0] bg-slate-50 flex items-center justify-between shrink-0">
               <div class="text-xs text-[#64748B]">
                 @if (isDirty()) {
@@ -291,7 +247,7 @@ import {
                   type="button"
                   [disabled]="!isDirty()"
                   (click)="discardChanges()"
-                  class="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 rounded-xl border border-slate-300 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  class="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 rounded-xl border border-slate-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Discard
                 </button>
@@ -299,17 +255,15 @@ import {
                   type="button"
                   [disabled]="!isDirty() || role.name === 'Super Admin'"
                   (click)="savePermissions()"
-                  class="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#6D42E8] to-[#D946EF] hover:opacity-95 rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  class="px-5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-[#6D42E8] to-[#D946EF] hover:opacity-95 rounded-xl shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                 >
                   <span class="material-icons text-sm">save</span>
                   <span>Save Changes</span>
                 </button>
               </div>
             </div>
-
           </div>
         }
-
       </div>
 
       <!-- Add Role Drawer -->
@@ -331,32 +285,27 @@ import {
 
         <form [formGroup]="addRoleForm" class="space-y-4 text-xs sm:text-[13px]">
           <div>
-            <label for="role-name-input" class="block font-semibold text-slate-700 mb-1">
-              Role Name <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="role-name-input"
-              type="text"
-              formControlName="name"
-              placeholder="e.g. Accounts Officer or Librarian"
-              class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-[#6D42E8] focus:ring-1 focus:ring-[#6D42E8]"
-            />
+            <label for="role-name-input" class="block font-semibold text-slate-700 mb-1">Role Name <span class="text-red-500">*</span></label>
+            <input id="role-name-input" type="text" formControlName="name" class="w-full h-10 px-3 bg-white border border-[#E2E8F0] rounded-xl text-slate-900" />
           </div>
-
           <div>
-            <label for="role-desc-input" class="block font-semibold text-slate-700 mb-1">
-              Description
-            </label>
-            <textarea
-              id="role-desc-input"
-              rows="3"
-              formControlName="description"
-              placeholder="Brief description of responsibilities and module scope"
-              class="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-[#6D42E8] focus:ring-1 focus:ring-[#6D42E8]"
-            ></textarea>
+            <label for="role-desc-input" class="block font-semibold text-slate-700 mb-1">Description</label>
+            <textarea id="role-desc-input" rows="3" formControlName="description" class="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-xl text-slate-900"></textarea>
           </div>
         </form>
       </app-form-drawer>
+
+      <!-- Unsaved Switch Confirmation Dialog -->
+      <app-confirm-dialog
+        [isOpen]="pendingSwitchRoleId() !== null"
+        title="Discard Unsaved Permission Changes?"
+        message="You have unsaved changes for the current role matrix. Switch roles and discard unsaved edits?"
+        confirmLabel="Discard & Switch"
+        variant="danger"
+        icon="warning_amber"
+        (cancelled)="pendingSwitchRoleId.set(null)"
+        (confirmed)="confirmRoleSwitch()"
+      />
 
       <!-- Delete Custom Role Confirm Dialog -->
       <app-confirm-dialog
@@ -364,7 +313,7 @@ import {
         title="Delete Custom Role"
         [message]="deleteRoleDialogMessage()"
         confirmLabel="Delete Role"
-        (closed)="isDeleteRoleDialogOpen.set(false)"
+        (cancelled)="isDeleteRoleDialogOpen.set(false)"
         (confirmed)="confirmDeleteRole()"
       />
 
@@ -376,9 +325,9 @@ export class RolesPermissionsPage {
 
   protected readonly moduleGroups = SIDEBAR_MODULE_GROUPS;
   protected readonly selectedRoleId = signal<string>('role-super-admin');
+  protected readonly pendingSwitchRoleId = signal<string | null>(null);
   protected readonly saveToastMessage = signal<string | null>(null);
 
-  // Editable local state matrix to support Discard / Save Changes
   protected readonly editedMatrix = signal<PermissionMatrix>({});
   protected readonly savedMatrix = signal<PermissionMatrix>({});
 
@@ -396,18 +345,46 @@ export class RolesPermissionsPage {
     return this.rolesWithCounts().find(r => r.id === id) || this.rolesWithCounts()[0] || null;
   });
 
+  protected readonly enabledPermissionCount = computed(() => {
+    const matrix = this.editedMatrix();
+    let enabled = 0;
+    let total = 0;
+    this.moduleGroups.forEach(group => {
+      group.modules.forEach(mod => {
+        total += 4;
+        const p = matrix[mod.key];
+        if (p) {
+          if (p.view) enabled++;
+          if (p.create) enabled++;
+          if (p.edit) enabled++;
+          if (p.delete) enabled++;
+        }
+      });
+    });
+    return { enabled, total };
+  });
+
   constructor() {
     this.initMatrixForRole(this.selectedRoleId());
   }
 
   protected selectRole(roleId: string): void {
+    if (roleId === this.selectedRoleId()) return;
     if (this.isDirty()) {
-      if (!confirm('You have unsaved changes for the current role. Switch anyway?')) {
-        return;
-      }
+      this.pendingSwitchRoleId.set(roleId);
+      return;
     }
     this.selectedRoleId.set(roleId);
     this.initMatrixForRole(roleId);
+  }
+
+  protected confirmRoleSwitch(): void {
+    const targetId = this.pendingSwitchRoleId();
+    this.pendingSwitchRoleId.set(null);
+    if (targetId) {
+      this.selectedRoleId.set(targetId);
+      this.initMatrixForRole(targetId);
+    }
   }
 
   private initMatrixForRole(roleId: string): void {
@@ -433,21 +410,16 @@ export class RolesPermissionsPage {
     const modPerm = current[modKey] ? { ...current[modKey] } : { view: false, create: false, edit: false, delete: false };
     modPerm[field] = checked;
 
-    // If unchecking view, uncheck create/edit/delete automatically
     if (field === 'view' && !checked) {
       modPerm.create = false;
       modPerm.edit = false;
       modPerm.delete = false;
     }
-    // If checking create/edit/delete, check view automatically
     if ((field === 'create' || field === 'edit' || field === 'delete') && checked) {
       modPerm.view = true;
     }
 
-    this.editedMatrix.set({
-      ...current,
-      [modKey]: modPerm
-    });
+    this.editedMatrix.set({ ...current, [modKey]: modPerm });
   }
 
   protected isRowFullyChecked(modKey: string): boolean {
@@ -496,8 +468,6 @@ export class RolesPermissionsPage {
     setTimeout(() => this.saveToastMessage.set(null), 4000);
   }
 
-  // ADD CUSTOM ROLE FORM
-
   protected readonly addRoleForm = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     description: new FormControl('')
@@ -528,8 +498,6 @@ export class RolesPermissionsPage {
     }
   }
 
-  // DELETE CUSTOM ROLE
-
   protected openDeleteRoleDialog(role: RoleDefinition, event: Event): void {
     event.stopPropagation();
     this.roleToDelete.set(role);
@@ -554,5 +522,26 @@ export class RolesPermissionsPage {
         this.deleteRoleErrorMessage.set(res.error || 'Cannot delete role.');
       }
     }
+  }
+
+  protected exportMatrixExcel(): void {
+    const role = this.activeRole();
+    if (!role) return;
+    const rows: Record<string, string | boolean>[] = [];
+    this.moduleGroups.forEach(group => {
+      group.modules.forEach(mod => {
+        const p = this.getPermission(mod.key);
+        rows.push({
+          Role: role.name,
+          Section: group.groupName,
+          Module: mod.label,
+          View: p.view ? 'Yes' : 'No',
+          Create: p.create ? 'Yes' : 'No',
+          Edit: p.edit ? 'Yes' : 'No',
+          Delete: p.delete ? 'Yes' : 'No'
+        });
+      });
+    });
+    exportToExcel(rows, `EduERP_Permissions_${role.name.replace(/\s+/g, '_')}`);
   }
 }

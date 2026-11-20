@@ -37,7 +37,6 @@ router.post('/firebase-sync', firebaseSyncUser);
 router.post('/logout', logoutSession);
 router.get('/session', authenticateToken, getSession);
 
-// Strictly Protected Admin-Only Endpoints
 router.get('/users', authenticateToken, requireRole([RbacRole.ADMIN]), getUserAccounts);
 router.get('/roles', authenticateToken, requireRole([RbacRole.ADMIN]), getRoles);
 router.post('/admin/accounts', authenticateToken, requireRole([RbacRole.ADMIN]), createAdminAccount);

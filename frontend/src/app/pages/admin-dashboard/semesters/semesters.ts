@@ -1,24 +1,26 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AcademicService, SemesterRecord } from '../../../services/academic.service';
 import { PageHeader } from '../../../components/shared/page-header';
 import { StatStrip, StatItem } from '../../../components/shared/stat-strip';
 import { DataToolbar, FilterOption } from '../../../components/shared/data-toolbar';
-import { DataTable, TableColumn } from '../../../components/shared/data-table';
+import { DataTable, TableColumn, TableCustomAction } from '../../../components/shared/data-table';
 import { FormDrawer } from '../../../components/shared/form-drawer';
 import { ConfirmDialog } from '../../../components/shared/confirm-dialog';
+import { exportToExcel, exportToPdf } from '../../../utils/export.helper';
 
 export interface SemesterRow extends SemesterRecord {
   displaySemester: string;
   formattedStartDate: string;
   formattedEndDate: string;
+  examWindowLabel: string;
 }
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-semesters-page',
   imports: [
-    FormsModule,
+    ReactiveFormsModule,
     PageHeader,
     StatStrip,
     DataToolbar,
@@ -28,19 +30,30 @@ export interface SemesterRow extends SemesterRecord {
   ],
   template: `
     <div class="flex flex-col gap-5 max-w-[1400px] mx-auto w-full font-sans">
-      
-      <!-- 1. Page Header -->
-      <app-page-header
-        title="Semesters"
-        subtitle="Configure academic terms, duration windows, and active session alignments."
-        actionLabel="Add Semester"
-        (actionClicked)="openAddDrawer()"
-      />
 
-      <!-- 2. Stat Strip (Max 3 small cards) -->
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <app-page-header
+          class="flex-1"
+          title="Semesters"
+          subtitle="Configure academic terms, registration windows, examination periods, and progression status."
+          actionLabel="Add Semester"
+          actionIcon="layers"
+          (actionClicked)="openAddDrawer()"
+        />
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" (click)="exportExcel()" class="h-10 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5">
+            <span class="material-icons text-sm text-emerald-600">table_view</span>
+            <span>Excel</span>
+          </button>
+          <button type="button" (click)="exportPdf()" class="h-10 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1.5">
+            <span class="material-icons text-sm text-rose-600">picture_as_pdf</span>
+            <span>PDF</span>
+          </button>
+        </div>
+      </div>
+
       <app-stat-strip [items]="statItems()" />
 
-      <!-- 3. Data Toolbar (Search + Course Filter + Academic Year Filter) -->
       <app-data-toolbar
         [searchValue]="searchQuery()"
         searchPlaceholder="Search by course or academic year..."
@@ -55,11 +68,11 @@ export interface SemesterRow extends SemesterRecord {
         (resetClicked)="resetFilters()"
       />
 
-      <!-- 4. Data Table Card -->
       <app-data-table
         [columns]="tableColumns"
         [data]="filteredSemesters()"
         idKey="id"
+        [customActions]="customRowActions"
         emptyIcon="layers"
         emptyTitle="No semesters found"
         emptyMessage="Try adjusting your course or academic year filters."
@@ -68,18 +81,19 @@ export interface SemesterRow extends SemesterRecord {
         (viewClicked)="onViewRecord($event)"
         (editClicked)="onEditRecord($event)"
         (deleteClicked)="onDeleteRecord($event)"
+        (customActionClicked)="handleCustomAction($event)"
       />
 
-      <!-- Slide-in Form Drawer -->
       <app-form-drawer
         [isOpen]="isDrawerOpen()"
         [title]="drawerTitle()"
         [subtitle]="drawerSubtitle()"
         [saveLabel]="isViewOnly() ? 'Close' : (editingId() ? 'Update Semester' : 'Save Semester')"
+        widthClass="max-w-[520px]"
         (closed)="closeDrawer()"
         (saved)="handleDrawerSave()"
       >
-        <div class="space-y-4">
+        <form [formGroup]="semForm" class="space-y-4">
           @if (formError()) {
             <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
               <span class="material-icons text-base text-red-600 shrink-0">error_outline</span>
@@ -87,16 +101,14 @@ export interface SemesterRow extends SemesterRecord {
             </div>
           }
 
-          <!-- Course Dropdown -->
           <div class="space-y-1.5">
             <label for="sem-course-select" class="block text-xs font-semibold text-slate-800">
               Course / Program <span class="text-red-500">*</span>
             </label>
             <select
               id="sem-course-select"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formCourse"
-              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
+              formControlName="course"
+              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50"
             >
               @for (c of courseList(); track c.id) {
                 <option [value]="c.name">{{ c.name }} ({{ c.code }})</option>
@@ -104,87 +116,81 @@ export interface SemesterRow extends SemesterRecord {
             </select>
           </div>
 
-          <!-- Semester Number (1-8) -->
-          <div class="space-y-1.5">
-            <label for="sem-number-input" class="block text-xs font-semibold text-slate-800">
-              Semester Number (1 to 8) <span class="text-red-500">*</span>
-            </label>
-            <input
-              id="sem-number-input"
-              type="number"
-              min="1"
-              max="8"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formSemesterNumber"
-              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
-            />
-          </div>
-
-          <!-- Academic Year Dropdown -->
-          <div class="space-y-1.5">
-            <label for="sem-year-select" class="block text-xs font-semibold text-slate-800">
-              Academic Year <span class="text-red-500">*</span>
-            </label>
-            <select
-              id="sem-year-select"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formAcademicYear"
-              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
-            >
-              @for (y of yearList(); track y.id) {
-                <option [value]="y.year">{{ y.year }} ({{ y.status }})</option>
-              }
-            </select>
-          </div>
-
-          <!-- Start Date & End Date Row -->
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1.5">
-              <label for="sem-start-date" class="block text-xs font-semibold text-slate-800">
-                Start Date <span class="text-red-500">*</span>
+              <label for="sem-number-input" class="block text-xs font-semibold text-slate-800">
+                Semester Number (1–8) <span class="text-red-500">*</span>
               </label>
               <input
-                id="sem-start-date"
-                type="date"
-                [disabled]="isViewOnly()"
-                [(ngModel)]="formStartDate"
-                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
+                id="sem-number-input"
+                type="number"
+                min="1"
+                max="8"
+                formControlName="semesterNumber"
+                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50"
               />
             </div>
+
             <div class="space-y-1.5">
-              <label for="sem-end-date" class="block text-xs font-semibold text-slate-800">
-                End Date <span class="text-red-500">*</span>
+              <label for="sem-year-select" class="block text-xs font-semibold text-slate-800">
+                Academic Year <span class="text-red-500">*</span>
               </label>
-              <input
-                id="sem-end-date"
-                type="date"
-                [disabled]="isViewOnly()"
-                [(ngModel)]="formEndDate"
-                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
-              />
+              <select
+                id="sem-year-select"
+                formControlName="academicYear"
+                class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50"
+              >
+                @for (y of yearList(); track y.id) {
+                  <option [value]="y.year">{{ y.year }} ({{ y.status }})</option>
+                }
+              </select>
             </div>
           </div>
 
-          <!-- Status -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label for="sem-start-date" class="block text-xs font-semibold text-slate-800">Term Start Date <span class="text-red-500">*</span></label>
+              <input id="sem-start-date" type="date" formControlName="startDate" class="w-full px-3.5 py-2 text-xs bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50" />
+            </div>
+            <div class="space-y-1.5">
+              <label for="sem-end-date" class="block text-xs font-semibold text-slate-800">Term End Date <span class="text-red-500">*</span></label>
+              <input id="sem-end-date" type="date" formControlName="endDate" class="w-full px-3.5 py-2 text-xs bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50" />
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Registration & Examination Windows</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <label for="sem-reg-start" class="block text-[11px] font-semibold text-slate-700">Registration Start</label>
+                <input id="sem-reg-start" type="date" formControlName="registrationStartDate" class="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E8F0] rounded-lg text-slate-900 disabled:bg-slate-100" />
+              </div>
+              <div class="space-y-1">
+                <label for="sem-reg-end" class="block text-[11px] font-semibold text-slate-700">Registration End</label>
+                <input id="sem-reg-end" type="date" formControlName="registrationEndDate" class="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E8F0] rounded-lg text-slate-900 disabled:bg-slate-100" />
+              </div>
+              <div class="space-y-1">
+                <label for="sem-exam-start" class="block text-[11px] font-semibold text-slate-700">Exam Start</label>
+                <input id="sem-exam-start" type="date" formControlName="examStartDate" class="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E8F0] rounded-lg text-slate-900 disabled:bg-slate-100" />
+              </div>
+              <div class="space-y-1">
+                <label for="sem-exam-end" class="block text-[11px] font-semibold text-slate-700">Exam End</label>
+                <input id="sem-exam-end" type="date" formControlName="examEndDate" class="w-full px-3 py-1.5 text-xs bg-white border border-[#E2E8F0] rounded-lg text-slate-900 disabled:bg-slate-100" />
+              </div>
+            </div>
+          </div>
+
           <div class="space-y-1.5">
-            <label for="sem-status-select" class="block text-xs font-semibold text-slate-800">
-              Status <span class="text-red-500">*</span>
-            </label>
-            <select
-              id="sem-status-select"
-              [disabled]="isViewOnly()"
-              [(ngModel)]="formStatus"
-              class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-500"
-            >
+            <label for="sem-status-select" class="block text-xs font-semibold text-slate-800">Status</label>
+            <select id="sem-status-select" formControlName="status" class="w-full px-3.5 py-2 text-xs sm:text-[13px] bg-white border border-[#E2E8F0] rounded-xl text-slate-900 disabled:bg-slate-50">
               <option value="Active">Active</option>
               <option value="Upcoming">Upcoming</option>
               <option value="Completed">Completed</option>
             </select>
           </div>
-        </div>
+        </form>
       </app-form-drawer>
 
-      <!-- Delete Confirmation Dialog -->
       <app-confirm-dialog
         [isOpen]="isDeleteDialogOpen()"
         title="Delete Semester"
@@ -207,19 +213,15 @@ export class SemestersPage {
   protected readonly courseList = computed(() => this.academicService.courses());
   protected readonly yearList = computed(() => this.academicService.academicYears());
 
-  protected readonly courseFilterOptions = computed<FilterOption[]>(() => {
-    return [
-      { label: 'Course: All', value: 'All' },
-      ...this.courseList().map(c => ({ label: c.name, value: c.name }))
-    ];
-  });
+  protected readonly courseFilterOptions = computed<FilterOption[]>(() => [
+    { label: 'Course: All', value: 'All' },
+    ...this.courseList().map(c => ({ label: c.name, value: c.name }))
+  ]);
 
-  protected readonly yearFilterOptions = computed<FilterOption[]>(() => {
-    return [
-      { label: 'Year: All', value: 'All' },
-      ...this.yearList().map(y => ({ label: y.year, value: y.year }))
-    ];
-  });
+  protected readonly yearFilterOptions = computed<FilterOption[]>(() => [
+    { label: 'Year: All', value: 'All' },
+    ...this.yearList().map(y => ({ label: y.year, value: y.year }))
+  ]);
 
   protected readonly tableColumns: TableColumn[] = [
     { key: 'displaySemester', header: 'Semester', isBold: true },
@@ -227,7 +229,17 @@ export class SemestersPage {
     { key: 'academicYear', header: 'Academic Year', isMono: true },
     { key: 'formattedStartDate', header: 'Start Date' },
     { key: 'formattedEndDate', header: 'End Date' },
+    { key: 'examWindowLabel', header: 'Exam Window' },
     { key: 'status', header: 'Status', isBadge: true }
+  ];
+
+  protected readonly customRowActions: TableCustomAction<SemesterRow>[] = [
+    {
+      id: 'advance',
+      label: 'Advance Status',
+      icon: 'fast_forward',
+      showIf: row => row.status !== 'Completed'
+    }
   ];
 
   protected readonly statItems = computed<StatItem[]>(() => {
@@ -262,18 +274,17 @@ export class SemestersPage {
     ];
   });
 
-  protected readonly filteredSemesters = computed(() => {
+  protected readonly filteredSemesters = computed<SemesterRow[]>(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const course = this.selectedCourse();
     const year = this.selectedYear();
-    const rawList = this.academicService.semesters();
 
-    return rawList
+    return this.academicService.semesters()
       .filter(item => {
         if (course !== 'All' && item.course !== course) return false;
         if (year !== 'All' && item.academicYear !== year) return false;
         if (query) {
-          const match = `${item.course} ${item.academicYear}`.toLowerCase();
+          const match = `${item.course} ${item.academicYear} Semester ${item.semesterNumber}`.toLowerCase();
           if (!match.includes(query)) return false;
         }
         return true;
@@ -282,16 +293,16 @@ export class SemestersPage {
         ...item,
         displaySemester: `Semester ${item.semesterNumber}`,
         formattedStartDate: this.formatDate(item.startDate),
-        formattedEndDate: this.formatDate(item.endDate)
+        formattedEndDate: this.formatDate(item.endDate),
+        examWindowLabel:
+          item.examStartDate && item.examEndDate
+            ? `${this.formatDate(item.examStartDate)} – ${this.formatDate(item.examEndDate)}`
+            : 'Not scheduled'
       }));
   });
 
   protected readonly hasActiveFilters = computed(() => {
-    return (
-      this.searchQuery().trim() !== '' ||
-      this.selectedCourse() !== 'All' ||
-      this.selectedYear() !== 'All'
-    );
+    return this.searchQuery().trim() !== '' || this.selectedCourse() !== 'All' || this.selectedYear() !== 'All';
   });
 
   protected readonly isDrawerOpen = signal<boolean>(false);
@@ -299,19 +310,24 @@ export class SemestersPage {
   protected readonly editingId = signal<string | null>(null);
   protected readonly formError = signal<string>('');
 
-  protected formSemesterNumber = 1;
-  protected formCourse = '';
-  protected formAcademicYear = '';
-  protected formStartDate = '';
-  protected formEndDate = '';
-  protected formStatus: 'Active' | 'Upcoming' | 'Completed' = 'Upcoming';
+  protected readonly semForm = new FormGroup({
+    semesterNumber: new FormControl(1, { nonNullable: true }),
+    course: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    academicYear: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    startDate: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    endDate: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    registrationStartDate: new FormControl('', { nonNullable: true }),
+    registrationEndDate: new FormControl('', { nonNullable: true }),
+    examStartDate: new FormControl('', { nonNullable: true }),
+    examEndDate: new FormControl('', { nonNullable: true }),
+    status: new FormControl<'Active' | 'Upcoming' | 'Completed'>('Upcoming', { nonNullable: true })
+  });
 
   protected readonly isDeleteDialogOpen = signal<boolean>(false);
   protected readonly deletingItem = signal<SemesterRow | null>(null);
   protected readonly deleteDialogMessage = computed(() => {
     const item = this.deletingItem();
-    if (!item) return '';
-    return `Are you sure you want to delete Semester ${item.semesterNumber} for ${item.course}?`;
+    return item ? `Are you sure you want to delete Semester ${item.semesterNumber} for ${item.course}?` : '';
   });
 
   protected readonly drawerTitle = computed(() => {
@@ -320,35 +336,41 @@ export class SemestersPage {
   });
 
   protected readonly drawerSubtitle = computed(() => {
-    if (this.isViewOnly()) return 'View term duration and session mapping.';
-    return 'Configure term number, course, and calendar dates.';
+    if (this.isViewOnly()) return 'View term duration, registration window, and exam period.';
+    return 'Configure term number, course, registration, and exam dates.';
   });
 
-  protected onSearchChange(val: string): void {
-    this.searchQuery.set(val);
-  }
-  protected onCourseFilterChange(val: string): void {
-    this.selectedCourse.set(val);
-  }
-  protected onYearFilterChange(val: string): void {
-    this.selectedYear.set(val);
-  }
+  protected onSearchChange(val: string): void { this.searchQuery.set(val); }
+  protected onCourseFilterChange(val: string): void { this.selectedCourse.set(val); }
+  protected onYearFilterChange(val: string): void { this.selectedYear.set(val); }
   protected resetFilters(): void {
     this.searchQuery.set('');
     this.selectedCourse.set('All');
     this.selectedYear.set('All');
   }
 
+  private setFormDisabled(disabled: boolean): void {
+    if (disabled) this.semForm.disable({ emitEvent: false });
+    else this.semForm.enable({ emitEvent: false });
+  }
+
   protected openAddDrawer(): void {
     this.isViewOnly.set(false);
     this.editingId.set(null);
     this.formError.set('');
-    this.formSemesterNumber = 1;
-    this.formCourse = this.courseList()[0]?.name || '';
-    this.formAcademicYear = this.yearList()[0]?.year || '';
-    this.formStartDate = '';
-    this.formEndDate = '';
-    this.formStatus = 'Upcoming';
+    this.setFormDisabled(false);
+    this.semForm.reset({
+      semesterNumber: 1,
+      course: this.courseList()[0]?.name || '',
+      academicYear: this.yearList()[0]?.year || '',
+      startDate: '',
+      endDate: '',
+      registrationStartDate: '',
+      registrationEndDate: '',
+      examStartDate: '',
+      examEndDate: '',
+      status: 'Upcoming'
+    });
     this.isDrawerOpen.set(true);
   }
 
@@ -356,12 +378,19 @@ export class SemestersPage {
     this.isViewOnly.set(true);
     this.editingId.set(item.id);
     this.formError.set('');
-    this.formSemesterNumber = item.semesterNumber;
-    this.formCourse = item.course;
-    this.formAcademicYear = item.academicYear;
-    this.formStartDate = item.startDate;
-    this.formEndDate = item.endDate;
-    this.formStatus = item.status;
+    this.semForm.reset({
+      semesterNumber: item.semesterNumber,
+      course: item.course,
+      academicYear: item.academicYear,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      registrationStartDate: item.registrationStartDate || '',
+      registrationEndDate: item.registrationEndDate || '',
+      examStartDate: item.examStartDate || '',
+      examEndDate: item.examEndDate || '',
+      status: item.status
+    });
+    this.setFormDisabled(true);
     this.isDrawerOpen.set(true);
   }
 
@@ -369,18 +398,47 @@ export class SemestersPage {
     this.isViewOnly.set(false);
     this.editingId.set(item.id);
     this.formError.set('');
-    this.formSemesterNumber = item.semesterNumber;
-    this.formCourse = item.course;
-    this.formAcademicYear = item.academicYear;
-    this.formStartDate = item.startDate;
-    this.formEndDate = item.endDate;
-    this.formStatus = item.status;
+    this.setFormDisabled(false);
+    this.semForm.reset({
+      semesterNumber: item.semesterNumber,
+      course: item.course,
+      academicYear: item.academicYear,
+      startDate: item.startDate,
+      endDate: item.endDate,
+      registrationStartDate: item.registrationStartDate || '',
+      registrationEndDate: item.registrationEndDate || '',
+      examStartDate: item.examStartDate || '',
+      examEndDate: item.examEndDate || '',
+      status: item.status
+    });
     this.isDrawerOpen.set(true);
   }
 
   protected onDeleteRecord(item: SemesterRow): void {
     this.deletingItem.set(item);
     this.isDeleteDialogOpen.set(true);
+  }
+
+  protected handleCustomAction(event: { actionId: string; row: SemesterRow }): void {
+    if (event.actionId === 'advance') {
+      const s = event.row;
+      const nextStatus: 'Active' | 'Completed' = s.status === 'Upcoming' ? 'Active' : 'Completed';
+      this.academicService.saveSemester(
+        {
+          semesterNumber: s.semesterNumber,
+          course: s.course,
+          academicYear: s.academicYear,
+          startDate: s.startDate,
+          endDate: s.endDate,
+          registrationStartDate: s.registrationStartDate,
+          registrationEndDate: s.registrationEndDate,
+          examStartDate: s.examStartDate,
+          examEndDate: s.examEndDate,
+          status: nextStatus
+        },
+        s.id
+      );
+    }
   }
 
   protected closeDrawer(): void {
@@ -393,23 +451,24 @@ export class SemestersPage {
       this.closeDrawer();
       return;
     }
-    if (!this.formCourse || !this.formAcademicYear) {
-      this.formError.set('Course and Academic Year are required.');
-      return;
-    }
-    if (!this.formStartDate || !this.formEndDate) {
-      this.formError.set('Start Date and End Date are required.');
+    const val = this.semForm.getRawValue();
+    if (!val.course || !val.academicYear || !val.startDate || !val.endDate) {
+      this.formError.set('Course, Academic Year, Start Date, and End Date are required.');
       return;
     }
 
     const res = this.academicService.saveSemester(
       {
-        semesterNumber: Number(this.formSemesterNumber) || 1,
-        course: this.formCourse,
-        academicYear: this.formAcademicYear,
-        startDate: this.formStartDate,
-        endDate: this.formEndDate,
-        status: this.formStatus
+        semesterNumber: Number(val.semesterNumber) || 1,
+        course: val.course,
+        academicYear: val.academicYear,
+        startDate: val.startDate,
+        endDate: val.endDate,
+        registrationStartDate: val.registrationStartDate || undefined,
+        registrationEndDate: val.registrationEndDate || undefined,
+        examStartDate: val.examStartDate || undefined,
+        examEndDate: val.examEndDate || undefined,
+        status: val.status
       },
       this.editingId() || undefined
     );
@@ -423,10 +482,39 @@ export class SemestersPage {
 
   protected confirmDelete(): void {
     const item = this.deletingItem();
-    if (item) {
-      this.academicService.deleteSemester(item.id);
-    }
+    if (item) this.academicService.deleteSemester(item.id);
     this.isDeleteDialogOpen.set(false);
+  }
+
+  protected exportExcel(): void {
+    exportToExcel(
+      this.filteredSemesters().map(s => ({
+        Semester: s.displaySemester,
+        Course: s.course,
+        'Academic Year': s.academicYear,
+        'Term Start': s.startDate,
+        'Term End': s.endDate,
+        'Exam Window': s.examWindowLabel,
+        Status: s.status
+      })),
+      'EduERP_Semesters'
+    );
+  }
+
+  protected exportPdf(): void {
+    exportToPdf(
+      'Semester Schedules & Examination Windows',
+      ['Semester', 'Course', 'Academic Year', 'Term Dates', 'Exam Window', 'Status'],
+      this.filteredSemesters().map(s => [
+        s.displaySemester,
+        s.course,
+        s.academicYear,
+        `${s.formattedStartDate} – ${s.formattedEndDate}`,
+        s.examWindowLabel,
+        s.status
+      ]),
+      'EduERP_Semesters'
+    );
   }
 
   private formatDate(iso: string): string {

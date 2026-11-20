@@ -7,12 +7,14 @@ export interface Notice {
   title: string;
   body: string;
   audience: NoticeAudience;
-  courseId?: string; // If audience is Course-wise
+  courseId?: string;
   priority: NoticePriority;
   publishDate: string;
   expiryDate: string;
   status: NoticeStatus;
   isPinned: boolean;
+  attachmentRef?: string;
+  readCount?: number;
   createdBy: string;
   createdOn: string;
 }
@@ -27,6 +29,7 @@ export interface Message {
   subject: string;
   body: string;
   timestamp: Date;
+  timestampIso?: string;
   isRead: boolean;
   folder: 'Inbox' | 'Sent';
   priority: 'Normal' | 'High';

@@ -21,6 +21,9 @@ export interface UserAccount {
   lastLogin: string;
   status: UserStatus;
   forcePasswordChange: boolean;
+  isLocked?: boolean;
+  failedLoginAttempts?: number;
+  activeSessionsCount?: number;
 }
 
 export interface ModulePermission {

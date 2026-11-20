@@ -15,6 +15,13 @@ service cloud.firestore {
       return isVerifiedUser() && request.auth.uid == ownerUid;
     }
 
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'jainwithchhavi@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
     function isValidId(id) {
       return id is string &&
         id.size() > 0 &&
@@ -25,27 +32,33 @@ service cloud.firestore {
     function isValidStudent(data) {
       return data.keys().hasAll(['id', 'enrollmentNo', 'name', 'email', 'ownerUid']) &&
         data.keys().hasOnly([
-          'id', 'enrollmentNo', 'name', 'email', 'phone', 'address',
-          'course', 'department', 'semester', 'section', 'status', 'ownerUid', 'createdAt'
+          'id', 'enrollmentNo', 'name', 'initials', 'gender', 'dob', 'email', 'phone', 'address',
+          'courseId', 'course', 'departmentId', 'department', 'semester', 'sectionId', 'section',
+          'batchName', 'academicYear', 'admissionDate', 'status', 'guardian', 'documents', 'remarks',
+          'ownerUid', 'createdAt', 'updatedAt'
         ]) &&
         isValidId(data.id) &&
         data.enrollmentNo is string && data.enrollmentNo.size() > 0 && data.enrollmentNo.size() <= 64 &&
         data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
         data.email is string && data.email.size() > 0 && data.email.size() <= 120 &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128;
+    }
+
+    function isValidErpRecord(data, docId) {
+      return data.keys().hasAll(['id', 'ownerUid']) &&
+        isValidId(docId) &&
+        data.id == docId &&
+        data.ownerUid is string &&
         data.ownerUid == request.auth.uid;
     }
 
     function isValidAssignment(data) {
-      return data.keys().hasAll(['id', 'title', 'subjectCode', 'studentId', 'ownerUid']) &&
-        data.keys().hasOnly([
-          'id', 'title', 'subjectCode', 'dueDate', 'status',
-          'submittedAt', 'grade', 'feedback', 'studentId', 'ownerUid'
-        ]) &&
+      return data.keys().hasAll(['id', 'title', 'subjectId', 'sectionId', 'ownerUid']) &&
         isValidId(data.id) &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
-        data.subjectCode is string && data.subjectCode.size() > 0 && data.subjectCode.size() <= 30 &&
-        isValidId(data.studentId) &&
-        data.ownerUid == request.auth.uid;
+        isValidId(data.subjectId) &&
+        isValidId(data.sectionId) &&
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128;
     }
 
     function isValidAssignmentSubmission(data) {
@@ -70,7 +83,7 @@ service cloud.firestore {
         data.version is int && data.version >= 0 &&
         data.submittedAt is string && data.submittedAt.size() <= 60 &&
         data.updatedAt is string && data.updatedAt.size() <= 60 &&
-        data.ownerUid == request.auth.uid;
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128;
     }
 
     function isValidFeePayment(data) {
@@ -122,7 +135,7 @@ service cloud.firestore {
         (!('sessionRef' in data) || (data.sessionRef is string && data.sessionRef.size() <= 100)) &&
         data.createdAt is string && data.createdAt.size() <= 60 &&
         data.updatedAt is string && data.updatedAt.size() <= 60 &&
-        data.ownerUid == request.auth.uid;
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128;
     }
 
     function isValidSupportTicket(data) {
@@ -149,7 +162,7 @@ service cloud.firestore {
         data.replies is list && data.replies.size() <= 50 &&
         data.createdAt is string && data.createdAt.size() <= 60 &&
         data.updatedAt is string && data.updatedAt.size() <= 60 &&
-        data.ownerUid == request.auth.uid;
+        data.ownerUid is string && data.ownerUid.size() > 0 && data.ownerUid.size() <= 128;
     }
 
     function isValidExamAttempt(data) {
@@ -187,51 +200,293 @@ service cloud.firestore {
         data.ownerUid == request.auth.uid;
     }
 
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'isSuperAdmin', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'name', 'isSuperAdmin', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 120 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
+        data.isSuperAdmin is bool &&
+        data.createdAt is string && data.createdAt.size() <= 60;
+    }
+
+    function isValidInstitutionalActivity(data) {
+      return data.keys().hasAll([
+          'id', 'user', 'role', 'operationType', 'action', 'target',
+          'module', 'category', 'timestampIso', 'icon', 'ownerUid'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'user', 'role', 'operationType', 'action', 'target',
+          'recordId', 'module', 'category', 'timestampIso', 'details', 'icon', 'ownerUid'
+        ]) &&
+        isValidId(data.id) &&
+        data.user is string && data.user.size() > 0 && data.user.size() <= 120 &&
+        data.role is string && data.role.size() > 0 && data.role.size() <= 80 &&
+        data.operationType in ['Create', 'Update', 'Delete', 'Approve', 'Reject', 'Publish', 'Export', 'Security'] &&
+        data.action is string && data.action.size() > 0 && data.action.size() <= 160 &&
+        data.target is string && data.target.size() > 0 && data.target.size() <= 300 &&
+        (!('recordId' in data) || (data.recordId is string && data.recordId.size() <= 128)) &&
+        data.module is string && data.module.size() > 0 && data.module.size() <= 80 &&
+        data.category in ['Academic', 'People', 'Attendance', 'Exams', 'Fees', 'Notices', 'Security'] &&
+        data.timestampIso is string && data.timestampIso.size() > 0 && data.timestampIso.size() <= 60 &&
+        (!('details' in data) || (data.details is string && data.details.size() <= 500)) &&
+        data.icon is string && data.icon.size() > 0 && data.icon.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
+    function isValidAdminAuditLog(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userName', 'role', 'module', 'action',
+          'target', 'status', 'timestampIso', 'ownerUid'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'userId', 'userName', 'role', 'module', 'action',
+          'target', 'status', 'ipAddress', 'oldValue', 'newValue', 'timestampIso', 'ownerUid'
+        ]) &&
+        isValidId(data.id) &&
+        data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+        data.userName is string && data.userName.size() > 0 && data.userName.size() <= 120 &&
+        data.role is string && data.role.size() > 0 && data.role.size() <= 60 &&
+        data.module is string && data.module.size() > 0 && data.module.size() <= 80 &&
+        data.action is string && data.action.size() > 0 && data.action.size() <= 80 &&
+        data.target is string && data.target.size() > 0 && data.target.size() <= 300 &&
+        data.status in ['Success', 'Failure', 'Warning', 'Failed'] &&
+        (!('ipAddress' in data) || (data.ipAddress is string && data.ipAddress.size() <= 64)) &&
+        (!('oldValue' in data) || (data.oldValue is string && data.oldValue.size() <= 1000)) &&
+        (!('newValue' in data) || (data.newValue is string && data.newValue.size() <= 1000)) &&
+        data.timestampIso is string && data.timestampIso.size() > 0 && data.timestampIso.size() <= 60 &&
+        data.ownerUid == request.auth.uid;
+    }
+
     // Default deny catch-all
     match /{document=**} {
       allow read, write: if false;
     }
 
-    match /students/{studentId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+    match /admins/{adminUid} {
+      allow get: if isAdmin() || isOwner(adminUid);
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() &&
+        isValidId(adminUid) &&
+        isValidAdminUser(request.resource.data) &&
+        request.resource.data.uid == adminUid;
+      allow delete: if false;
+    }
+
+    match /institutionalActivities/{activityId} {
+      allow get: if isAdmin() || isOwner(resource.data.ownerUid);
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
+        isValidId(activityId) &&
+        isValidInstitutionalActivity(request.resource.data) &&
+        request.resource.data.id == activityId;
+      allow update, delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isAdmin() &&
+        isValidId(logId) &&
+        isValidAdminAuditLog(request.resource.data) &&
+        request.resource.data.id == logId;
+      allow update, delete: if false;
+    }
+
+    match /students/{studentId} {
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
+      allow create: if (isVerifiedUser() || isAdmin()) &&
         isValidId(studentId) &&
         isValidStudent(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.id == studentId;
-      allow update: if isOwner(resource.data.ownerUid) &&
+      allow update: if (isOwner(resource.data.ownerUid) || isAdmin()) &&
         isValidStudent(request.resource.data) &&
         request.resource.data.id == resource.data.id &&
         request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isAdmin();
+    }
+
+    match /academicYears/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /academicCalendarEvents/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /departments/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /courses/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /semesters/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /sections/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /batches/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /subjects/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /subjectAllocations/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /studentAdmissions/{docId} {
+      allow get: if isAdmin() || isOwner(resource.data.ownerUid);
+      allow list: if isAdmin();
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /facultyMembers/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /parents/{docId} {
+      allow get: if isAdmin() || isOwner(resource.data.ownerUid);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /userAccounts/{docId} {
+      allow get, list: if isAdmin();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /roles/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /attendanceSessions/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin() || isOwner(resource.data.ownerUid);
+    }
+
+    match /examinations/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /examResults/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update: if isAdmin() || (isOwner(resource.data.ownerUid) && resource.data.locked != true && resource.data.status != 'Published');
+      allow delete: if isAdmin();
+    }
+
+    match /timetableSlots/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /feeStructures/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /scholarships/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /feeReceipts/{docId} {
+      allow get, list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update: if isAdmin();
       allow delete: if false;
+    }
+
+    match /notices/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /messages/{docId} {
+      allow get, list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin() || isOwner(resource.data.ownerUid);
+    }
+
+    match /notifications/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isVerifiedUser() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin() || isVerifiedUser();
+    }
+
+    match /systemSettings/{docId} {
+      allow get, list: if isVerifiedUser();
+      allow create: if isAdmin() && isValidErpRecord(request.resource.data, docId);
+      allow update, delete: if isAdmin();
     }
 
     match /assignments/{assignmentId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get, list: if isVerifiedUser();
       allow create: if isVerifiedUser() &&
         isValidId(assignmentId) &&
         isValidAssignment(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.id == assignmentId;
-      allow update: if isOwner(resource.data.ownerUid) &&
+      allow update: if (isOwner(resource.data.ownerUid) || isAdmin()) &&
         isValidAssignment(request.resource.data) &&
         request.resource.data.id == resource.data.id &&
         request.resource.data.ownerUid == resource.data.ownerUid;
-      allow delete: if false;
+      allow delete: if isAdmin() || isOwner(resource.data.ownerUid);
     }
 
     match /assignmentSubmissions/{submissionId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
         isValidId(submissionId) &&
         isValidAssignmentSubmission(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.id == submissionId &&
         request.resource.data.status != 'Evaluated';
-      allow update: if isOwner(resource.data.ownerUid) &&
+      allow update: if (isOwner(resource.data.ownerUid) || isAdmin()) &&
         isValidAssignmentSubmission(request.resource.data) &&
-        resource.data.status != 'Evaluated' &&
-        request.resource.data.status != 'Evaluated' &&
+        (isAdmin() || (resource.data.status != 'Evaluated' && request.resource.data.status != 'Evaluated')) &&
         request.resource.data.id == resource.data.id &&
         request.resource.data.assignmentId == resource.data.assignmentId &&
         request.resource.data.studentId == resource.data.studentId &&
@@ -240,8 +495,8 @@ service cloud.firestore {
     }
 
     match /feePayments/{paymentId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
         isValidId(paymentId) &&
         isValidFeePayment(request.resource.data) &&
@@ -251,43 +506,54 @@ service cloud.firestore {
     }
 
     match /leaveRequests/{requestId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
         isValidId(requestId) &&
         isValidLeaveRequest(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.id == requestId &&
         request.resource.data.status == 'Pending';
-      allow update: if isOwner(resource.data.ownerUid) &&
-        isValidLeaveRequest(request.resource.data) &&
-        resource.data.status == 'Pending' &&
-        request.resource.data.status == 'Withdrawn' &&
+      allow update: if isValidLeaveRequest(request.resource.data) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
         request.resource.data.id == resource.data.id &&
-        request.resource.data.ownerUid == resource.data.ownerUid;
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        (
+          (isOwner(resource.data.ownerUid) && resource.data.status == 'Pending' && request.resource.data.status == 'Withdrawn') ||
+          (isAdmin() && request.resource.data.status in ['Approved', 'Rejected', 'Pending'])
+        );
       allow delete: if false;
     }
 
     match /supportTickets/{ticketId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
         isValidId(ticketId) &&
         isValidSupportTicket(request.resource.data) &&
+        request.resource.data.ownerUid == request.auth.uid &&
         request.resource.data.id == ticketId &&
         request.resource.data.status == 'Open';
-      allow update: if isOwner(resource.data.ownerUid) &&
-        isValidSupportTicket(request.resource.data) &&
-        resource.data.status != 'Closed' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies', 'updatedAt']) &&
+      allow update: if isValidSupportTicket(request.resource.data) &&
         request.resource.data.id == resource.data.id &&
-        request.resource.data.ownerUid == resource.data.ownerUid;
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        (
+          (
+            isOwner(resource.data.ownerUid) &&
+            resource.data.status != 'Closed' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies', 'updatedAt'])
+          ) ||
+          (
+            isAdmin() &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'replies', 'updatedAt'])
+          )
+        );
       allow delete: if false;
     }
 
     match /examAttempts/{attemptId} {
-      allow get: if isOwner(resource.data.ownerUid);
-      allow list: if isVerifiedUser() && resource.data.ownerUid == request.auth.uid;
+      allow get: if isOwner(resource.data.ownerUid) || isAdmin();
+      allow list: if isAdmin() || (isVerifiedUser() && resource.data.ownerUid == request.auth.uid);
       allow create: if isVerifiedUser() &&
         isValidId(attemptId) &&
         isValidExamAttempt(request.resource.data) &&
